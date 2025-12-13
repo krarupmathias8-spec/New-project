@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/session";
+import { DashboardShell } from "@/components/layout/DashboardShell";
 
 export default async function DashboardLayout({
   children,
@@ -10,6 +11,10 @@ export default async function DashboardLayout({
   const session = await getSession();
   if (!session?.user) redirect("/auth/sign-in");
 
-  return <div className="min-h-screen bg-zinc-50">{children}</div>;
+  return (
+    <DashboardShell user={{ name: session.user.name, email: session.user.email }}>
+      {children}
+    </DashboardShell>
+  );
 }
 

@@ -2,8 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import type { CreativeType } from "@/generated/prisma";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const CREATIVE_TYPES: { label: string; value: CreativeType }[] = [
   { label: "Meta Ads", value: "META_ADS" },
@@ -27,80 +30,84 @@ export function ProjectActions({
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="grid gap-3 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm font-semibold text-zinc-900">Actions</div>
-          <div className="mt-1 text-sm text-zinc-600">
-            Ingest the site, then generate structured creatives.
+    <Card className="shadow-soft">
+      <CardHeader>
+        <CardTitle>Actions</CardTitle>
+        <CardDescription>Ingest the site, then generate structured creatives.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {error ? (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
           </div>
-        </div>
-      </div>
+        ) : null}
 
-      {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60"
-          disabled={Boolean(loading)}
-          onClick={async () => {
-            setLoading("ingest");
-            setError(null);
-            try {
-              const res = await fetch(`/api/projects/${projectId}/ingest`, { method: "POST" });
-              if (!res.ok) {
-                const json = (await res.json().catch(() => null)) as { error?: string } | null;
-                setError(json?.error ?? "Unable to start ingestion");
-                return;
-              }
-              router.refresh();
-            } finally {
-              setLoading(null);
-            }
-          }}
-        >
-          {loading === "ingest" ? "Starting…" : "Run ingestion"}
-        </button>
-
-        {CREATIVE_TYPES.map((t) => (
-          <button
-            key={t.value}
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
-            disabled={!canGenerate || Boolean(loading)}
-            title={!canGenerate ? "Run ingestion first" : undefined}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            disabled={Boolean(loading)}
             onClick={async () => {
-              setLoading(t.value);
+              setLoading("ingest");
               setError(null);
+              toast.loading("Starting ingestion…");
               try {
-                const res = await fetch(`/api/projects/${projectId}/generate`, {
-                  method: "POST",
-                  headers: { "content-type": "application/json" },
-                  body: JSON.stringify({ type: t.value }),
-                });
-                const json = (await res.json().catch(() => null)) as unknown;
+                const res = await fetch(`/api/projects/${projectId}/ingest`, { method: "POST" });
                 if (!res.ok) {
-                  const err =
-                    json && typeof json === "object" && "error" in json
-                      ? String((json as { error?: unknown }).error ?? "")
-                      : "";
-                  setError(err || "Unable to start generation");
+                  const json = (await res.json().catch(() => null)) as { error?: string } | null;
+                  const msg = json?.error ?? "Unable to start ingestion";
+                  setError(msg);
+                  toast.error(msg);
                   return;
                 }
+                toast.success("Ingestion queued");
                 router.refresh();
               } finally {
                 setLoading(null);
               }
             }}
           >
-            {loading === t.value ? "Queued…" : `Generate ${t.label}`}
-          </button>
-        ))}
-      </div>
-    </div>
+            {loading === "ingest" ? "Starting…" : "Run ingestion"}
+          </Button>
+
+          {CREATIVE_TYPES.map((t) => (
+            <Button
+              key={t.value}
+              variant="outline"
+              disabled={!canGenerate || Boolean(loading)}
+              title={!canGenerate ? "Run ingestion first" : undefined}
+              onClick={async () => {
+                setLoading(t.value);
+                setError(null);
+                toast.loading(`Queuing ${t.label}…`);
+                try {
+                  const res = await fetch(`/api/projects/${projectId}/generate`, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ type: t.value }),
+                  });
+                  const json = (await res.json().catch(() => null)) as unknown;
+                  if (!res.ok) {
+                    const err =
+                      json && typeof json === "object" && "error" in json
+                        ? String((json as { error?: unknown }).error ?? "")
+                        : "";
+                    const msg = err || "Unable to start generation";
+                    setError(msg);
+                    toast.error(msg);
+                    return;
+                  }
+                  toast.success(`${t.label} queued`);
+                  router.refresh();
+                } finally {
+                  setLoading(null);
+                }
+              }}
+            >
+              {loading === t.value ? "Queued…" : `Generate ${t.label}`}
+            </Button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

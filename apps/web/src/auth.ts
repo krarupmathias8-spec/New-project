@@ -15,7 +15,8 @@ const CredentialsSchema = z.object({
 
 export const authConfig = {
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "database" },
+  // Credentials provider requires JWT strategy in NextAuth v4.
+  session: { strategy: "jwt" },
   secret: env.AUTH_SECRET,
   providers: [
     // OAuth (optional in local dev if env is missing)
@@ -56,6 +57,19 @@ export const authConfig = {
   ],
   pages: {
     signIn: "/auth/sign-in",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      // Persist the user id in the token (credentials + oauth).
+      if (user?.id) token.sub = user.id;
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token?.sub) {
+        (session.user as { id?: string }).id = String(token.sub);
+      }
+      return session;
+    },
   },
 } satisfies NextAuthOptions;
 

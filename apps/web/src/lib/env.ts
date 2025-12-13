@@ -6,6 +6,8 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
 
   AUTH_SECRET: z.string().min(1),
+  NEXTAUTH_URL: z.string().url().optional(),
+  NEXTAUTH_SECRET: z.string().min(1).optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
 

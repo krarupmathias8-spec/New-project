@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export default async function GenerationPage({
   params,
@@ -40,82 +43,95 @@ export default async function GenerationPage({
   if (!gen) redirect(`/dashboard/projects/${projectId}`);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10">
-      <header className="flex flex-col gap-2">
-        <div className="text-sm text-zinc-600">
-          <Link className="font-medium text-zinc-900" href={`/dashboard/projects/${projectId}`}>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <header className="space-y-2">
+        <div className="text-sm text-muted-foreground">
+          <Link className="font-medium text-foreground hover:underline" href={`/dashboard/projects/${projectId}`}>
             Project
           </Link>{" "}
-          <span className="text-zinc-400">/</span> Generation
+          <span className="text-muted-foreground/60">/</span> Generation
         </div>
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-zinc-900">{gen.type}</h1>
-            <div className="mt-1 text-sm text-zinc-600">
-              Status: <span className="font-medium text-zinc-900">{gen.status}</span>
+            <h1 className="text-2xl font-semibold tracking-tight">{gen.type}</h1>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {new Date(gen.createdAt).toLocaleString()}
             </div>
           </div>
-          <div className="text-xs text-zinc-500">{new Date(gen.createdAt).toLocaleString()}</div>
+          <Badge variant={gen.status === "SUCCEEDED" ? "success" : gen.status === "FAILED" ? "destructive" : "secondary"}>
+            {gen.status}
+          </Badge>
         </div>
       </header>
 
       {gen.error ? (
-        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">
-          {gen.error}
-        </div>
+        <Card className="border-destructive/20 bg-destructive/10 shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-destructive">Run failed</CardTitle>
+            <CardDescription className="text-destructive/80">{gen.error}</CardDescription>
+          </CardHeader>
+        </Card>
       ) : null}
 
-      <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-zinc-900">Output (JSON)</div>
+      <Card className="shadow-soft">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle>Output</CardTitle>
+            <CardDescription>Structured JSON (copy/export-ready).</CardDescription>
+          </div>
           <div className="flex items-center gap-2">
-            <a
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-900 hover:bg-zinc-50"
-              href={`/api/generations/${gen.id}/export?format=json`}
-            >
-              Download JSON
-            </a>
-            <a
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-900 hover:bg-zinc-50"
-              href={`/api/generations/${gen.id}/export?format=csv`}
-            >
-              Download CSV
-            </a>
+            <Button asChild variant="outline" size="sm">
+              <a href={`/api/generations/${gen.id}/export?format=json`}>Download JSON</a>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href={`/api/generations/${gen.id}/export?format=csv`}>Download CSV</a>
+            </Button>
           </div>
-        </div>
-        <pre className="max-h-[560px] overflow-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-800">
-          {JSON.stringify(gen.output ?? {}, null, 2)}
-        </pre>
-      </section>
+        </CardHeader>
+        <CardContent>
+          <pre className="max-h-[560px] overflow-auto rounded-lg border bg-muted/20 p-4 text-xs leading-5">
+            {JSON.stringify(gen.output ?? {}, null, 2)}
+          </pre>
+        </CardContent>
+      </Card>
 
-      <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="mb-3 text-sm font-semibold text-zinc-900">Visual assets</div>
-        {gen.visualAssets.length === 0 ? (
-          <div className="text-sm text-zinc-600">No images generated for this run yet.</div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {gen.visualAssets.map((a) => (
-              <div key={a.id} className="rounded-xl border border-zinc-200 p-4">
-                <div className="text-xs font-medium text-zinc-500">
-                  {a.format} · {a.width}×{a.height}
-                </div>
-                {a.resultUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="mt-3 w-full rounded-lg border border-zinc-200" src={a.resultUrl} alt="" />
-                ) : (
-                  <div className="mt-3 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-6 text-sm text-zinc-600">
-                    Image pending…
+      <Card className="shadow-soft">
+        <CardHeader>
+          <CardTitle>Visual assets</CardTitle>
+          <CardDescription>Generated ad images (square/portrait/landscape).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {gen.visualAssets.length === 0 ? (
+            <div className="rounded-lg border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
+              No images generated for this run yet.
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {gen.visualAssets.map((a) => (
+                <div key={a.id} className="rounded-xl border bg-background p-4 shadow-sm">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    {a.format} · {a.width}×{a.height}
                   </div>
-                )}
-                <details className="mt-3">
-                  <summary className="cursor-pointer text-sm font-medium text-zinc-900">Prompt</summary>
-                  <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-zinc-700">{a.prompt}</div>
-                </details>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+                  {a.resultUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="mt-3 w-full rounded-lg border" src={a.resultUrl} alt="" />
+                  ) : (
+                    <div className="mt-3 rounded-lg border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
+                      Image pending…
+                    </div>
+                  )}
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-sm font-medium">Prompt</summary>
+                    <div className="mt-2 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
+                      {a.prompt}
+                    </div>
+                  </details>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

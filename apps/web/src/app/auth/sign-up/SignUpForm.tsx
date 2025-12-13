@@ -2,6 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -15,6 +20,7 @@ export function SignUpForm() {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        toast.loading("Creating account…");
 
         const form = e.currentTarget;
         const formData = new FormData(form);
@@ -33,8 +39,10 @@ export function SignUpForm() {
           if (!res.ok) {
             const json = (await res.json().catch(() => null)) as { error?: string } | null;
             setError(json?.error ?? "Unable to create account");
+            toast.error(json?.error ?? "Unable to create account");
             return;
           }
+          toast.success("Account created. Please sign in.");
           router.push("/auth/sign-in");
         } finally {
           setLoading(false);
@@ -42,51 +50,36 @@ export function SignUpForm() {
       }}
     >
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-900">Name (optional)</span>
-        <input
-          className="h-11 rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none ring-0 focus:border-zinc-400"
-          name="name"
-          type="text"
-          autoComplete="name"
-        />
-      </label>
+      <div className="grid gap-2">
+        <Label htmlFor="name">Name (optional)</Label>
+        <Input id="name" name="name" type="text" autoComplete="name" />
+      </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-900">Email</span>
-        <input
-          className="h-11 rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none ring-0 focus:border-zinc-400"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-        />
-      </label>
+      <div className="grid gap-2">
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" name="email" type="email" autoComplete="email" required />
+      </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-zinc-900">Password</span>
-        <input
-          className="h-11 rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none ring-0 focus:border-zinc-400"
+      <div className="grid gap-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
           name="password"
           type="password"
           autoComplete="new-password"
           required
           minLength={8}
         />
-      </label>
+      </div>
 
-      <button
-        className="mt-1 inline-flex h-11 items-center justify-center rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60"
-        type="submit"
-        disabled={loading}
-      >
+      <Button className="mt-1" type="submit" disabled={loading}>
         {loading ? "Creating…" : "Create account"}
-      </button>
+      </Button>
     </form>
   );
 }

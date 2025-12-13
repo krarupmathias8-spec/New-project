@@ -1,10 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { CreateProjectForm } from "./CreateProjectForm";
-import { SignOutForm } from "./SignOutForm";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export default async function DashboardHome() {
   const session = await getSession();
@@ -30,54 +31,62 @@ export default async function DashboardHome() {
   });
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm font-semibold text-zinc-900">Dashboard</div>
-          <div className="mt-1 text-sm text-zinc-600">
-            {user.name ?? user.email}
-          </div>
-        </div>
-
-        <SignOutForm />
-      </header>
-
-      <div className="mt-8">
-        <CreateProjectForm />
+    <div className="mx-auto w-full max-w-5xl space-y-8">
+      <div>
+        <div className="text-sm font-semibold">Overview</div>
+        <div className="mt-1 text-sm text-muted-foreground">{user.name ?? user.email}</div>
       </div>
 
-      <section className="mt-8">
-        <div className="mb-3 text-sm font-semibold text-zinc-900">Projects</div>
-        {projects.length === 0 ? (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-600 shadow-sm">
-            No projects yet. Create your first one above.
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            {projects.map((p) => (
-              <Link
-                key={p.id}
-                href={`/dashboard/projects/${p.id}`}
-                className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm hover:border-zinc-300"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-zinc-900">
-                      {p.name}
-                    </div>
-                    <div className="mt-1 truncate text-sm text-zinc-600">
+      <CreateProjectForm />
+
+      <Card className="shadow-soft">
+        <CardHeader>
+          <CardTitle>Projects</CardTitle>
+          <CardDescription>All projects in your workspace.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {projects.length === 0 ? (
+            <div className="rounded-lg border border-dashed bg-muted/20 p-8 text-sm text-muted-foreground">
+              No projects yet. Create your first one above.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>URL</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projects.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">
+                      <a className="hover:underline" href={`/dashboard/projects/${p.id}`}>
+                        {p.name}
+                      </a>
+                    </TableCell>
+                    <TableCell className="max-w-[360px] truncate text-muted-foreground">
                       {p.primaryUrl}
-                    </div>
-                  </div>
-                  <div className="text-xs font-medium text-zinc-500">
-                    {p.activeBrandDnaId ? "Brand DNA ready" : "Needs ingestion"}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
+                    </TableCell>
+                    <TableCell>
+                      {p.activeBrandDnaId ? (
+                        <Badge variant="success">Brand DNA ready</Badge>
+                      ) : (
+                        <Badge variant="warning">Needs ingestion</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {new Date(p.createdAt).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

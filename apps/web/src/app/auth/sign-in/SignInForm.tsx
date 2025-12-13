@@ -1,6 +1,12 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type Props = {
   callbackUrl: string;
@@ -30,10 +36,15 @@ export function SignInForm({ callbackUrl, showGoogle }: Props) {
   }, []);
 
   return (
-    <div className="flex w-full flex-col gap-4">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="flex w-full flex-col gap-4"
+    >
       {showGoogle ? (
         <a
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+          className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
           href={`/api/auth/signin/google?callbackUrl=${encodeURIComponent(callbackUrl)}`}
         >
           Continue with Google
@@ -41,53 +52,47 @@ export function SignInForm({ callbackUrl, showGoogle }: Props) {
       ) : null}
 
       <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-zinc-200" />
-        <span className="text-xs font-medium text-zinc-500">or</span>
-        <div className="h-px flex-1 bg-zinc-200" />
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">or</span>
+        <div className="h-px flex-1 bg-border" />
       </div>
 
       {error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
-      <form className="flex flex-col gap-3" method="post" action={actionUrl}>
+      <form
+        className="flex flex-col gap-3"
+        method="post"
+        action={actionUrl}
+        onSubmit={() => toast.loading("Signing in…")}
+      >
         <input type="hidden" name="csrfToken" value={csrfToken} />
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
 
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-zinc-900">Email</span>
-          <input
-            className="h-11 rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none ring-0 focus:border-zinc-400"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-          />
-        </label>
+        <div className="grid gap-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" autoComplete="email" required />
+        </div>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-zinc-900">Password</span>
-          <input
-            className="h-11 rounded-lg border border-zinc-200 bg-white px-3 text-sm outline-none ring-0 focus:border-zinc-400"
+        <div className="grid gap-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
             name="password"
             type="password"
             autoComplete="current-password"
             required
           />
-        </label>
+        </div>
 
-        <button
-          className="mt-1 inline-flex h-11 items-center justify-center rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white hover:bg-zinc-800"
-          type="submit"
-          disabled={!csrfToken}
-          title={!csrfToken ? "Loading…" : undefined}
-        >
+        <Button type="submit" disabled={!csrfToken} className="mt-1">
           Sign in
-        </button>
+        </Button>
       </form>
-    </div>
+    </motion.div>
   );
 }
 
