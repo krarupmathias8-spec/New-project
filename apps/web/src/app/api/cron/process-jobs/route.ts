@@ -9,10 +9,15 @@ function unauthorized() {
   return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 }
 
-export async function POST(req: Request) {
-  // Auth: require CRON_SECRET
-  const secret = req.headers.get("x-cron-secret");
-  if (!env.CRON_SECRET || secret !== env.CRON_SECRET) return unauthorized();
+async function handler(req: Request) {
+  // Auth (Vercel Cron recommended pattern):
+  // - Set CRON_SECRET in Vercel env vars
+  // - Vercel will call this endpoint with: Authorization: Bearer <CRON_SECRET>
+  const auth = req.headers.get("authorization") ?? "";
+  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7) : null;
+  const legacy = req.headers.get("x-cron-secret");
+  const ok = Boolean(env.CRON_SECRET) && (bearer === env.CRON_SECRET || legacy === env.CRON_SECRET);
+  if (!ok) return unauthorized();
 
   // Process a small batch to avoid serverless timeouts.
   const workerId = `vercel-${Date.now()}`;
@@ -87,5 +92,13 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ claimed: claimed.length, results });
+}
+
+export async function GET(req: Request) {
+  return handler(req);
+}
+
+export async function POST(req: Request) {
+  return handler(req);
 }
 
