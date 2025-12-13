@@ -1,0 +1,263 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum CreativeType {
+  META_ADS
+  GOOGLE_ADS
+  TIKTOK_HOOKS
+  MARKETING_EMAIL
+  SOCIAL_POSTS
+  ANGLES_HOOKS_HEADLINES
+  AB_VARIANTS
+}
+
+enum ImageFormat {
+  SQUARE_1_1
+  PORTRAIT_4_5
+  LANDSCAPE_16_9
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  memberships  Membership[]
+  projects     Project[]     @relation("ProjectOwner")
+  sessions     Session[]
+  accounts     Account[]
+  ingestions   IngestionRun[] @relation("IngestionRequestedBy")
+  generations  GenerationRun[] @relation("GenerationRequestedBy")
+}
+
+model Organization {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  members   Membership[]
+  projects  Project[]
+
+  @@index([slug])
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  role           MembershipRole @default(MEMBER)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  userId         String
+  organizationId String
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Project {
+  id            String        @id @default(cuid())
+  name          String
+  slug          String
+  primaryUrl    String
+  industry      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  organizationId String
+  ownerId        String
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner         User          @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+
+  brandDnas      BrandDna[]
+  brandPages     BrandPage[]
+  ingestions     IngestionRun[]
+  generations    GenerationRun[]
+
+  activeBrandDnaId String?   @unique
+  activeBrandDna   BrandDna?    @relation("ActiveBrandDna", fields: [activeBrandDnaId], references: [id])
+
+  @@unique([organizationId, slug])
+  @@index([ownerId])
+  @@index([organizationId])
+}
+
+model BrandPage {
+  id         String   @id @default(cuid())
+  url        String
+  title      String?
+  content    String
+  contentSha String
+  createdAt  DateTime @default(now())
+
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@unique([projectId, url])
+}
+
+model BrandDna {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+
+  // Structured "Brand DNA" JSON used as the single source of truth for generation.
+  dna        Json
+  // Optional: full extracted corpus used to build the DNA (for debugging / re-ingestion).
+  corpus     String?
+
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // reverse relation for the active pointer on Project
+  activeFor  Project? @relation("ActiveBrandDna")
+
+  ingestions  IngestionRun[]
+  generations GenerationRun[]
+
+  @@index([projectId, createdAt(sort: Desc)])
+}
+
+model IngestionRun {
+  id          String    @id @default(cuid())
+  status      RunStatus @default(QUEUED)
+  inputUrl    String
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  error       String?
+  stats       Json?
+  createdAt   DateTime  @default(now())
+
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  brandDnaId  String?
+  brandDna    BrandDna? @relation(fields: [brandDnaId], references: [id], onDelete: SetNull)
+
+  requestedById String?
+  requestedBy   User?   @relation("IngestionRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model GenerationRun {
+  id            String       @id @default(cuid())
+  type          CreativeType
+  status        RunStatus    @default(QUEUED)
+  model         String?
+  parameters    Json?
+  output        Json?
+  usage         Json?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  error         String?
+  createdAt     DateTime     @default(now())
+
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  brandDnaId    String
+  brandDna      BrandDna     @relation(fields: [brandDnaId], references: [id], onDelete: Restrict)
+
+  requestedById String?
+  requestedBy   User?        @relation("GenerationRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  visualAssets  VisualAsset[]
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([type])
+}
+
+model VisualAsset {
+  id             String      @id @default(cuid())
+  format         ImageFormat
+  width          Int
+  height         Int
+  prompt         String
+  negativePrompt String?
+  openaiImageId  String?
+  resultUrl      String?
+  createdAt      DateTime    @default(now())
+
+  generationRunId String
+  generationRun   GenerationRun @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+
+  @@index([generationRunId])
+}
+
+// Auth.js / OAuth tables (Prisma Adapter)
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
