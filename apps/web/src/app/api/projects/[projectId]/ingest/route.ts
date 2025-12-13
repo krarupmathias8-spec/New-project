@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { getQueues } from "@/lib/queue";
+import { enqueueJob } from "@/jobs/dbQueue";
 
 export async function POST(
   req: Request,
@@ -36,9 +36,10 @@ export async function POST(
     select: { id: true, status: true, createdAt: true },
   });
 
-  const { ingestionQueue, connection } = getQueues();
-  await ingestionQueue.add("ingest", { ingestionRunId: run.id }, { removeOnComplete: 1000, removeOnFail: 1000 });
-  await connection.quit();
+  await enqueueJob({
+    type: "INGESTION",
+    payload: { ingestionRunId: run.id },
+  });
 
   return NextResponse.json({ ingestionRun: run }, { status: 202 });
 }

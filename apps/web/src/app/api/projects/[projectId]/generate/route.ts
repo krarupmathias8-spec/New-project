@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { getQueues } from "@/lib/queue";
 import { CreativeType, Prisma } from "@/generated/prisma";
+import { enqueueJob } from "@/jobs/dbQueue";
 
 const GenerateSchema = z.object({
   type: z.nativeEnum(CreativeType),
@@ -57,13 +57,10 @@ export async function POST(
     select: { id: true, status: true, type: true, createdAt: true },
   });
 
-  const { generationQueue, connection } = getQueues();
-  await generationQueue.add(
-    "generate",
-    { generationRunId: run.id, type: run.type },
-    { removeOnComplete: 1000, removeOnFail: 1000 }
-  );
-  await connection.quit();
+  await enqueueJob({
+    type: "GENERATION",
+    payload: { generationRunId: run.id, type: run.type },
+  });
 
   return NextResponse.json({ generationRun: run }, { status: 202 });
 }

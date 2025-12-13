@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { getQueues } from "@/lib/queue";
 import { ImageFormat } from "@/generated/prisma";
+import { enqueueJob } from "@/jobs/dbQueue";
 
 const ImagesSchema = z.object({
   generationRunId: z.string().min(1),
@@ -43,13 +43,10 @@ export async function POST(
   });
   if (!run) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  const { imagesQueue, connection } = getQueues();
-  await imagesQueue.add(
-    "images",
-    { generationRunId: run.id, formats: parsed.data.formats },
-    { removeOnComplete: 1000, removeOnFail: 1000 }
-  );
-  await connection.quit();
+  await enqueueJob({
+    type: "IMAGES",
+    payload: { generationRunId: run.id, formats: parsed.data.formats },
+  });
 
   return NextResponse.json({ ok: true }, { status: 202 });
 }

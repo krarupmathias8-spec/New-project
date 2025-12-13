@@ -11,7 +11,8 @@ const EnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
 
-  REDIS_URL: z.string().min(1).optional(),
+  // Used by the Vercel Cron endpoint to authorize job processing.
+  CRON_SECRET: z.string().min(1).optional(),
 
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_TEXT_MODEL: z.string().min(1).optional(),
