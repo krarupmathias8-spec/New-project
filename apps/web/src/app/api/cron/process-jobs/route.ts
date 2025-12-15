@@ -19,9 +19,20 @@ async function handler(req: Request) {
   const ok = Boolean(env.CRON_SECRET) && (bearer === env.CRON_SECRET || legacy === env.CRON_SECRET);
   if (!ok) return unauthorized();
 
-  // Process a small batch to avoid serverless timeouts.
+  // Recover stuck jobs (previous invocation timed out).
+  await prisma.$executeRaw`
+    UPDATE "Job"
+    SET status = 'QUEUED',
+        "lockedAt" = NULL,
+        "lockedBy" = NULL
+    WHERE status = 'RUNNING'
+      AND "lockedAt" IS NOT NULL
+      AND "lockedAt" < NOW() - INTERVAL '15 minutes';
+  `;
+
+  // Process a tiny batch to avoid serverless timeouts.
   const workerId = `vercel-${Date.now()}`;
-  const maxJobs = 3;
+  const maxJobs = 1;
 
   const claimed = await prisma.$transaction(async (tx) => {
     // Atomically claim jobs using SKIP LOCKED to avoid concurrent workers processing the same rows.

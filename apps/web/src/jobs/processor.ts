@@ -12,99 +12,125 @@ function now() {
 }
 
 export async function runIngestionJob(payload: { ingestionRunId: string }) {
-  await prisma.ingestionRun.update({
-    where: { id: payload.ingestionRunId },
-    data: { status: "RUNNING", startedAt: now(), error: null },
-  });
+  try {
+    await prisma.ingestionRun.update({
+      where: { id: payload.ingestionRunId },
+      data: { status: "RUNNING", startedAt: now(), error: null },
+    });
 
-  const run = await prisma.ingestionRun.findUnique({
-    where: { id: payload.ingestionRunId },
-    select: { id: true, inputUrl: true, projectId: true },
-  });
-  if (!run) throw new Error("ingestion_run_not_found");
+    const run = await prisma.ingestionRun.findUnique({
+      where: { id: payload.ingestionRunId },
+      select: { id: true, inputUrl: true, projectId: true },
+    });
+    if (!run) throw new Error("ingestion_run_not_found");
 
-  const pages = await scrapeBrandPages(run.inputUrl);
-  if (pages.length === 0) throw new Error("no_pages_scraped");
+    const pages = await scrapeBrandPages(run.inputUrl);
+    if (pages.length === 0) throw new Error("no_pages_scraped");
 
-  await prisma.brandPage.createMany({
-    data: pages.map((p) => ({
-      projectId: run.projectId,
-      url: p.url,
-      title: p.title,
-      content: p.content,
-      contentSha: p.contentSha,
-    })),
-    skipDuplicates: true,
-  });
+    await prisma.brandPage.createMany({
+      data: pages.map((p) => ({
+        projectId: run.projectId,
+        url: p.url,
+        title: p.title,
+        content: p.content,
+        contentSha: p.contentSha,
+      })),
+      skipDuplicates: true,
+    });
 
-  const corpus = pages
-    .map((p) => `URL: ${p.url}\nTITLE: ${p.title ?? ""}\nCONTENT:\n${p.content}\n`)
-    .join("\n---\n");
+    const corpus = pages
+      .map((p) => `URL: ${p.url}\nTITLE: ${p.title ?? ""}\nCONTENT:\n${p.content}\n`)
+      .join("\n---\n");
 
-  const analyzed = await analyzeBrandFromPages({
-    primaryUrl: run.inputUrl,
-    pages: pages.map((p) => ({ url: p.url, title: p.title, content: p.content })),
-  });
+    const analyzed = await analyzeBrandFromPages({
+      primaryUrl: run.inputUrl,
+      pages: pages.map((p) => ({ url: p.url, title: p.title, content: p.content })),
+    });
 
-  const brandDna = await prisma.brandDna.create({
-    data: {
-      projectId: run.projectId,
-      dna: analyzed.data as unknown as Prisma.InputJsonValue,
-      corpus,
-    },
-    select: { id: true },
-  });
+    const brandDna = await prisma.brandDna.create({
+      data: {
+        projectId: run.projectId,
+        dna: analyzed.data as unknown as Prisma.InputJsonValue,
+        corpus,
+      },
+      select: { id: true },
+    });
 
-  await prisma.project.update({
-    where: { id: run.projectId },
-    data: { activeBrandDnaId: brandDna.id },
-  });
+    await prisma.project.update({
+      where: { id: run.projectId },
+      data: { activeBrandDnaId: brandDna.id },
+    });
 
-  await prisma.ingestionRun.update({
-    where: { id: payload.ingestionRunId },
-    data: {
-      status: "SUCCEEDED",
-      finishedAt: now(),
-      brandDnaId: brandDna.id,
-      stats: { pages: pages.length, model: analyzed.model, usage: analyzed.usage } as unknown as Prisma.InputJsonValue,
-    },
-  });
+    await prisma.ingestionRun.update({
+      where: { id: payload.ingestionRunId },
+      data: {
+        status: "SUCCEEDED",
+        finishedAt: now(),
+        brandDnaId: brandDna.id,
+        stats: {
+          pages: pages.length,
+          model: analyzed.model,
+          usage: analyzed.usage,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? e);
+    await prisma.ingestionRun
+      .update({
+        where: { id: payload.ingestionRunId },
+        data: { status: "FAILED", finishedAt: now(), error: msg },
+      })
+      .catch(() => null);
+    throw e;
+  }
 }
 
 export async function runGenerationJob(payload: { generationRunId: string; type: CreativeType }) {
-  await prisma.generationRun.update({
-    where: { id: payload.generationRunId },
-    data: { status: "RUNNING", startedAt: now(), error: null },
-  });
+  try {
+    await prisma.generationRun.update({
+      where: { id: payload.generationRunId },
+      data: { status: "RUNNING", startedAt: now(), error: null },
+    });
 
-  const run = await prisma.generationRun.findUnique({
-    where: { id: payload.generationRunId },
-    select: { id: true, type: true, brandDna: { select: { dna: true } } },
-  });
-  if (!run) throw new Error("generation_run_not_found");
+    const run = await prisma.generationRun.findUnique({
+      where: { id: payload.generationRunId },
+      select: { id: true, type: true, brandDna: { select: { dna: true } } },
+    });
+    if (!run) throw new Error("generation_run_not_found");
 
-  const generated = await generateCreatives({
-    type: run.type,
-    brandDna: run.brandDna.dna,
-  });
+    const generated = await generateCreatives({
+      type: run.type,
+      brandDna: run.brandDna.dna,
+    });
 
-  await prisma.generationRun.update({
-    where: { id: run.id },
-    data: {
-      status: "SUCCEEDED",
-      finishedAt: now(),
-      output: generated.data as unknown as Prisma.InputJsonValue,
-      usage: generated.usage as unknown as Prisma.InputJsonValue,
-      model: generated.model,
-    },
-  });
+    await prisma.generationRun.update({
+      where: { id: run.id },
+      data: {
+        status: "SUCCEEDED",
+        finishedAt: now(),
+        output: generated.data as unknown as Prisma.InputJsonValue,
+        usage: generated.usage as unknown as Prisma.InputJsonValue,
+        model: generated.model,
+      },
+    });
 
-  // Auto-enqueue images (optional).
-  const formats: ImageFormat[] = ["SQUARE_1_1", "PORTRAIT_4_5", "LANDSCAPE_16_9"];
-  await enqueueJob({
-    type: "IMAGES",
-    payload: { generationRunId: run.id, formats },
-  });
+    // Auto-enqueue images (optional).
+    const formats: ImageFormat[] = ["SQUARE_1_1", "PORTRAIT_4_5", "LANDSCAPE_16_9"];
+    await enqueueJob({
+      type: "IMAGES",
+      payload: { generationRunId: run.id, formats },
+    });
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? e);
+    await prisma.generationRun
+      .update({
+        where: { id: payload.generationRunId },
+        data: { status: "FAILED", finishedAt: now(), error: msg },
+      })
+      .catch(() => null);
+    throw e;
+  }
 }
 
 export async function runImagesJob(payload: { generationRunId: string; formats: ImageFormat[] }) {
