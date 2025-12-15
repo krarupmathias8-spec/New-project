@@ -1,7 +1,7 @@
 import { Prisma, type CreativeType, type ImageFormat } from "@/generated/prisma";
 
 import { prisma } from "@/lib/prisma";
-import { scrapeBrandPages } from "@/ingestion/scrape";
+import { scrapeBrandSite } from "@/ingestion/scrape";
 import { analyzeBrandFromPages } from "@/ai/brandAnalyzer";
 import { generateCreatives } from "@/ai/creativeEngine";
 import { generateAdImage } from "@/ai/imageCreator";
@@ -24,7 +24,9 @@ export async function runIngestionJob(payload: { ingestionRunId: string }) {
     });
     if (!run) throw new Error("ingestion_run_not_found");
 
-    const pages = await scrapeBrandPages(run.inputUrl);
+    const scraped = await scrapeBrandSite(run.inputUrl);
+    const pages = scraped.pages;
+    const assets = scraped.assets;
     if (pages.length === 0) throw new Error("no_pages_scraped");
 
     await prisma.brandPage.createMany({
@@ -45,6 +47,7 @@ export async function runIngestionJob(payload: { ingestionRunId: string }) {
     const analyzed = await analyzeBrandFromPages({
       primaryUrl: run.inputUrl,
       pages: pages.map((p) => ({ url: p.url, title: p.title, content: p.content })),
+      assets,
     });
 
     const brandDna = await prisma.brandDna.create({

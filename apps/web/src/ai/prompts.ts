@@ -14,11 +14,15 @@ Rules:
 export function brandAnalyzerUserPrompt(args: {
   primaryUrl: string;
   pages: { url: string; title?: string; content: string }[];
+  assets?: { url: string; kind: string; alt?: string; sourcePageUrl: string }[];
 }) {
   return `
 Analyze the following website pages and produce a structured Brand DNA.
 
 Primary URL: ${args.primaryUrl}
+
+Discovered assets (logos/product images/icons/og:image). Use these to infer brand visuals and include in the Brand DNA assets section:
+${JSON.stringify((args.assets ?? []).slice(0, 40), null, 2)}
 
 Pages:
 ${args.pages

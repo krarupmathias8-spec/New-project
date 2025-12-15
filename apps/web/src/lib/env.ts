@@ -17,6 +17,10 @@ const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_TEXT_MODEL: z.string().min(1).optional(),
   OPENAI_IMAGE_MODEL: z.string().min(1).optional(),
+
+  // Optional: Browserless/Playwright rendering for JS-heavy sites.
+  BROWSERLESS_URL: z.string().url().optional(),
+  BROWSERLESS_TOKEN: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

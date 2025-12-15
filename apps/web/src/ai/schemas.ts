@@ -2,6 +2,36 @@ import { z } from "zod";
 
 export const BrandDnaSchema = z.object({
   version: z.string().default("1.0"),
+  assets: z
+    .object({
+      logos: z
+        .array(
+          z.object({
+            url: z.string().url(),
+            alt: z.string().optional(),
+            sourcePageUrl: z.string().url().optional(),
+          })
+        )
+        .default([]),
+      productImages: z
+        .array(
+          z.object({
+            url: z.string().url(),
+            alt: z.string().optional(),
+            sourcePageUrl: z.string().url().optional(),
+          })
+        )
+        .default([]),
+      ogImages: z
+        .array(
+          z.object({
+            url: z.string().url(),
+            sourcePageUrl: z.string().url().optional(),
+          })
+        )
+        .default([]),
+    })
+    .default({ logos: [], productImages: [], ogImages: [] }),
   brand: z.object({
     name: z.string().min(1),
     website: z.string().url(),
