@@ -11,13 +11,15 @@ function unauthorized() {
 
 async function handler(req: Request) {
   // Auth (Vercel Cron recommended pattern):
-  // - Set CRON_SECRET in Vercel env vars
-  // - Vercel will call this endpoint with: Authorization: Bearer <CRON_SECRET>
+  // - Real Vercel Cron invocations include the `x-vercel-cron` header.
+  // - For manual/debug invocations, use Authorization: Bearer <CRON_SECRET>.
   const auth = req.headers.get("authorization") ?? "";
   const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7) : null;
   const legacy = req.headers.get("x-cron-secret");
-  const ok = Boolean(env.CRON_SECRET) && (bearer === env.CRON_SECRET || legacy === env.CRON_SECRET);
-  if (!ok) return unauthorized();
+  const isVercelCron = req.headers.get("x-vercel-cron") === "1";
+  const okSecret =
+    Boolean(env.CRON_SECRET) && (bearer === env.CRON_SECRET || legacy === env.CRON_SECRET);
+  if (!isVercelCron && !okSecret) return unauthorized();
 
   // Recover stuck jobs (previous invocation timed out).
   await prisma.$executeRaw`
