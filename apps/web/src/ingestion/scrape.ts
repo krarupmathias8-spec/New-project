@@ -76,7 +76,8 @@ export async function scrapeBrandPages(primaryUrl: string): Promise<ScrapedPage[
       const { title, content } = extractText(html);
       if (!content || content.length < 200) continue;
 
-      const trimmed = content.slice(0, 60_000);
+      // Keep content bounded for serverless + LLM latency/cost.
+      const trimmed = content.slice(0, 20_000);
       pages.push({
         url,
         title,
@@ -88,7 +89,7 @@ export async function scrapeBrandPages(primaryUrl: string): Promise<ScrapedPage[
     }
   }
 
-  // Keep at most N pages to bound token cost.
-  return pages.slice(0, 6);
+  // Keep at most N pages to bound token cost and avoid timeouts on Vercel.
+  return pages.slice(0, 3);
 }
 

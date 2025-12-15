@@ -36,6 +36,8 @@ async function handler(req: Request) {
   const workerId = `vercel-${Date.now()}`;
   const maxJobs = 1;
 
+  console.log("[cron] tick", { workerId, maxJobs });
+
   const claimed = await prisma.$transaction(async (tx) => {
     // Atomically claim jobs using SKIP LOCKED to avoid concurrent workers processing the same rows.
     const rows = (await tx.$queryRaw`
@@ -71,6 +73,7 @@ async function handler(req: Request) {
 
   for (const job of claimed) {
     try {
+      console.log("[cron] processing", { id: job.id, type: job.type, attempts: job.attempts });
       if (job.type === "INGESTION") {
         const p = job.payload as { ingestionRunId: string };
         await runIngestionJob(p);
@@ -90,6 +93,7 @@ async function handler(req: Request) {
     } catch (e) {
       const msg = String((e as Error)?.message ?? e);
       const shouldRetry = job.attempts < job.maxAttempts;
+      console.error("[cron] failed", { id: job.id, type: job.type, msg });
 
       await prisma.job.update({
         where: { id: job.id },
@@ -104,6 +108,7 @@ async function handler(req: Request) {
     }
   }
 
+  console.log("[cron] done", { claimed: claimed.length, results });
   return NextResponse.json({ claimed: claimed.length, results });
 }
 
