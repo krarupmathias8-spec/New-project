@@ -24,12 +24,25 @@ async function handler(req: Request) {
   // Recover stuck jobs (previous invocation timed out).
   await prisma.$executeRaw`
     UPDATE "Job"
+    SET status = 'FAILED',
+        "lockedAt" = NULL,
+        "lockedBy" = NULL,
+        "lastError" = 'Timeout (max attempts reached)'
+    WHERE status = 'RUNNING'
+      AND "lockedAt" IS NOT NULL
+      AND "lockedAt" < NOW() - INTERVAL '15 minutes'
+      AND attempts >= "maxAttempts";
+  `;
+
+  await prisma.$executeRaw`
+    UPDATE "Job"
     SET status = 'QUEUED',
         "lockedAt" = NULL,
         "lockedBy" = NULL
     WHERE status = 'RUNNING'
       AND "lockedAt" IS NOT NULL
-      AND "lockedAt" < NOW() - INTERVAL '15 minutes';
+      AND "lockedAt" < NOW() - INTERVAL '15 minutes'
+      AND attempts < "maxAttempts";
   `;
 
   // Process a tiny batch to avoid serverless timeouts.
@@ -46,6 +59,7 @@ async function handler(req: Request) {
         FROM "Job"
         WHERE status = 'QUEUED'
           AND "availableAt" <= NOW()
+          AND attempts < "maxAttempts"
         ORDER BY "createdAt" ASC
         FOR UPDATE SKIP LOCKED
         LIMIT ${maxJobs}
