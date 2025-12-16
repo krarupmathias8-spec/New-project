@@ -45,7 +45,7 @@ describe('Job Runner', () => {
       };
 
       // Mock the transaction result
-      (prisma.$transaction as any).mockImplementationOnce(async (callback: any) => {
+      (prisma.$transaction as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async (callback: (tx: any) => Promise<any>) => {
         const tx = {
           $queryRaw: vi.fn().mockResolvedValue([mockJob]),
         };
@@ -70,7 +70,7 @@ describe('Job Runner', () => {
         maxAttempts: 3,
       };
 
-      (prisma.$transaction as any).mockImplementationOnce(async (callback: any) => {
+      (prisma.$transaction as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async (callback: (tx: any) => Promise<any>) => {
         const tx = {
           $queryRaw: vi.fn().mockResolvedValue([mockJob]),
         };
@@ -78,7 +78,7 @@ describe('Job Runner', () => {
       });
 
       // Mock failure
-      (processor.runIngestionJob as any).mockRejectedValue(new Error('Processing failed'));
+      (processor.runIngestionJob as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Processing failed'));
 
       await processNextJobs();
 
@@ -103,14 +103,14 @@ describe('Job Runner', () => {
         maxAttempts: 3,
       };
 
-      (prisma.$transaction as any).mockImplementationOnce(async (callback: any) => {
+      (prisma.$transaction as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async (callback: (tx: any) => Promise<any>) => {
         const tx = {
           $queryRaw: vi.fn().mockResolvedValue([mockJob]),
         };
         return await callback(tx);
       });
 
-      (processor.runIngestionJob as any).mockRejectedValue(new Error('Processing failed'));
+      (processor.runIngestionJob as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Processing failed'));
 
       await processNextJobs();
 
