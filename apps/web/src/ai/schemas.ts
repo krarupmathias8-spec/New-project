@@ -1,8 +1,14 @@
 import { z } from "zod";
 
+// Helper to ensure we always get an object, even if input is undefined or array
+const ensureObject = (val: unknown) => {
+  if (!val || typeof val !== 'object' || Array.isArray(val)) return {};
+  return val;
+};
+
 export const BrandDnaSchema = z.object({
   version: z.string().default("1.0"),
-  assets: z
+  assets: z.preprocess(ensureObject, z
     .object({
       logos: z
         .array(
@@ -31,8 +37,9 @@ export const BrandDnaSchema = z.object({
         )
         .default([]),
     })
-    .default({ logos: [], productImages: [], ogImages: [] }),
-  brand: z.object({
+    .default({ logos: [], productImages: [], ogImages: [] })
+  ),
+  brand: z.preprocess(ensureObject, z.object({
     name: z.string().min(1).default("Unknown Brand"),
     website: z.string().url().optional(),
     category: z.string().min(1).default("General"),
@@ -43,8 +50,8 @@ export const BrandDnaSchema = z.object({
     category: "General",
     oneLiner: "",
     valueProp: ""
-  }),
-  tone: z.object({
+  })),
+  tone: z.preprocess(ensureObject, z.object({
     adjectives: z.array(z.string().min(1)).default([]),
     voice: z.string().min(1).default("Neutral"),
     styleGuidelines: z.array(z.string().min(1)).default([]),
@@ -56,8 +63,8 @@ export const BrandDnaSchema = z.object({
     styleGuidelines: [],
     wordsToPrefer: [],
     wordsToAvoid: []
-  }),
-  audience: z.object({
+  })),
+  audience: z.preprocess(ensureObject, z.object({
     icpSummary: z.string().min(1).default("General Audience"),
     personas: z
       .array(
@@ -75,8 +82,8 @@ export const BrandDnaSchema = z.object({
     icpSummary: "General Audience",
     personas: [],
     segments: []
-  }),
-  offer: z.object({
+  })),
+  offer: z.preprocess(ensureObject, z.object({
     keyBenefits: z.array(z.string().min(1)).default([]),
     differentiators: z.array(z.string().min(1)).default([]),
     objections: z
@@ -91,14 +98,14 @@ export const BrandDnaSchema = z.object({
     keyBenefits: [],
     differentiators: [],
     objections: []
-  }),
-  constraints: z.object({
+  })),
+  constraints: z.preprocess(ensureObject, z.object({
     complianceNotes: z.array(z.string().min(1)).default([]),
     claimsToAvoid: z.array(z.string().min(1)).default([]),
   }).default({
     complianceNotes: [],
     claimsToAvoid: []
-  }),
+  })),
 });
 
 export type BrandDna = z.infer<typeof BrandDnaSchema>;
