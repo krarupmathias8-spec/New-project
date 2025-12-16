@@ -33,50 +33,50 @@ export const BrandDnaSchema = z.object({
     })
     .default({ logos: [], productImages: [], ogImages: [] }),
   brand: z.object({
-    name: z.string().min(1),
-    website: z.string().url(),
-    category: z.string().min(1),
-    oneLiner: z.string().min(1),
-    valueProp: z.string().min(1),
-  }),
+    name: z.string().min(1).default("Unknown Brand"),
+    website: z.string().url().optional(),
+    category: z.string().min(1).default("General"),
+    oneLiner: z.string().min(1).default(""),
+    valueProp: z.string().min(1).default(""),
+  }).default({}),
   tone: z.object({
-    adjectives: z.array(z.string().min(1)).min(3),
-    voice: z.string().min(1),
-    styleGuidelines: z.array(z.string().min(1)).min(3),
+    adjectives: z.array(z.string().min(1)).default([]),
+    voice: z.string().min(1).default("Neutral"),
+    styleGuidelines: z.array(z.string().min(1)).default([]),
     wordsToPrefer: z.array(z.string().min(1)).default([]),
     wordsToAvoid: z.array(z.string().min(1)).default([]),
-  }),
+  }).default({}),
   audience: z.object({
-    icpSummary: z.string().min(1),
+    icpSummary: z.string().min(1).default("General Audience"),
     personas: z
       .array(
         z.object({
-          name: z.string().min(1),
-          role: z.string().min(1),
-          industry: z.string().min(1),
-          pains: z.array(z.string().min(1)).min(2),
-          desiredOutcomes: z.array(z.string().min(1)).min(2),
+          name: z.string().min(1).default("Persona"),
+          role: z.string().min(1).default("User"),
+          industry: z.string().min(1).default("Any"),
+          pains: z.array(z.string().min(1)).default([]),
+          desiredOutcomes: z.array(z.string().min(1)).default([]),
         })
       )
-      .min(1),
+      .default([]),
     segments: z.array(z.string().min(1)).default([]),
-  }),
+  }).default({}),
   offer: z.object({
-    keyBenefits: z.array(z.string().min(1)).min(3),
-    differentiators: z.array(z.string().min(1)).min(2),
+    keyBenefits: z.array(z.string().min(1)).default([]),
+    differentiators: z.array(z.string().min(1)).default([]),
     objections: z
       .array(
         z.object({
-          objection: z.string().min(1),
-          rebuttal: z.string().min(1),
+          objection: z.string().min(1).default("Cost"),
+          rebuttal: z.string().min(1).default("Value"),
         })
       )
-      .min(3),
-  }),
+      .default([]),
+  }).default({}),
   constraints: z.object({
     complianceNotes: z.array(z.string().min(1)).default([]),
     claimsToAvoid: z.array(z.string().min(1)).default([]),
-  }),
+  }).default({}),
 });
 
 export type BrandDna = z.infer<typeof BrandDnaSchema>;
@@ -168,4 +168,3 @@ export const CreativeOutputSchema = z.discriminatedUnion("type", [
 ]);
 
 export type CreativeOutput = z.infer<typeof CreativeOutputSchema>;
-
