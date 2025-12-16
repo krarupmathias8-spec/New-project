@@ -39,6 +39,7 @@ You will generate marketing creatives that are consistent with the Brand DNA.
 
 Rules:
 - Output MUST be valid JSON matching the provided schema.
+- IMPORTANT: The root JSON object MUST include the property "type" set exactly to the requested CreativeType (e.g. "META_ADS", "GOOGLE_ADS").
 - Follow the brand tone, forbidden/preferred words, and compliance constraints.
 - Avoid fluff; optimize for clarity and conversion.
 - Create multiple distinct angles; avoid near-duplicates.
@@ -50,7 +51,15 @@ export function creativeEngineUserPrompt(args: {
   notes?: string;
 }) {
   return `
-Generate creatives of type: ${args.type}
+Generate creatives for the specific type: "${args.type}".
+
+CRITICAL INSTRUCTION:
+Your output JSON must start with:
+{
+  "type": "${args.type}",
+  ...
+}
+followed by the specific fields for this creative type.
 
 Brand DNA (JSON):
 ${JSON.stringify(args.brandDna, null, 2)}
@@ -69,4 +78,3 @@ Rules:
 - Keep imagery consistent with tone and audience (B2B: clean, modern, product-led).
 - Output MUST be valid JSON matching the provided schema.
 `.trim();
-
