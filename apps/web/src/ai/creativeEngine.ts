@@ -23,7 +23,8 @@ export async function generateCreatives(args: {
 
   // Manual fix: Inject the missing discriminator if needed
   if (data && typeof data === 'object' && !Array.isArray(data)) {
-    if (!('type' in data) || (data as any).type !== args.type) {
+    const obj = data as { type?: unknown };
+    if (!('type' in obj) || obj.type !== args.type) {
       console.log(`[creativeEngine] Injecting missing/correct type '${args.type}' into response`);
       data = { ...data, type: args.type };
     }
