@@ -1,0 +1,7 @@
+{
+  "devDependencies": {
+    "dotenv": "^17.2.3",
+    "vite-tsconfig-paths": "^6.0.1",
+    "vitest": "^4.0.15"
+  }
+}
