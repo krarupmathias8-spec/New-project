@@ -89,6 +89,7 @@ function mergeScrapedAssetsIntoBrandDna(args: {
   );
 
   const existingLogos = Array.isArray(assets.logos) ? (assets.logos as unknown[]) : [];
+  const existingIcons = Array.isArray(assets.icons) ? (assets.icons as unknown[]) : [];
   const existingProducts = Array.isArray(assets.productImages) ? (assets.productImages as unknown[]) : [];
   const existingOg = Array.isArray(assets.ogImages) ? (assets.ogImages as unknown[]) : [];
 
@@ -98,6 +99,7 @@ function mergeScrapedAssetsIntoBrandDna(args: {
       existingLogos.length > 0
         ? existingLogos
         : (scrapedLogos.length ? scrapedLogos : scrapedIcons),
+    icons: existingIcons.length > 0 ? existingIcons : scrapedIcons.map((i) => ({ url: i.url, sourcePageUrl: i.sourcePageUrl })),
     productImages:
       existingProducts.length > 0
         ? existingProducts

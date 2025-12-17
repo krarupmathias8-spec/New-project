@@ -8,6 +8,16 @@ const ensureObject = (val: unknown) => {
 
 export const BrandDnaSchema = z.object({
   version: z.string().default("1.0"),
+  citations: z
+    .array(
+      z.object({
+        field: z.string().min(1).default(""),
+        url: z.string().url(),
+        quote: z.string().min(1).default(""),
+        confidence: z.number().min(0).max(1).default(0.6),
+      })
+    )
+    .default([]),
   assets: z.preprocess(ensureObject, z
     .object({
       logos: z
@@ -15,6 +25,14 @@ export const BrandDnaSchema = z.object({
           z.object({
             url: z.string().url(),
             alt: z.string().optional(),
+            sourcePageUrl: z.string().url().optional(),
+          })
+        )
+        .default([]),
+      icons: z
+        .array(
+          z.object({
+            url: z.string().url(),
             sourcePageUrl: z.string().url().optional(),
           })
         )
@@ -37,19 +55,31 @@ export const BrandDnaSchema = z.object({
         )
         .default([]),
     })
-    .default({ logos: [], productImages: [], ogImages: [] })
+    .default({ logos: [], icons: [], productImages: [], ogImages: [] })
   ),
   brand: z.preprocess(ensureObject, z.object({
     name: z.string().min(1).default("Unknown Brand"),
     website: z.string().url().optional(),
-    category: z.string().min(1).default("General"),
+    category: z.string().min(1).default("General"), // human-friendly category
+    industry: z.string().min(1).optional(), // ex: "M&A marketplace"
+    businessModel: z
+      .enum(["marketplace", "saas", "agency", "ecommerce", "media", "services", "other"])
+      .optional(),
+    tagline: z.string().optional(),
+    description: z.string().optional(),
     oneLiner: z.string().min(1).default(""),
     valueProp: z.string().min(1).default(""),
+    positioning: z.array(z.string().min(1)).default([]),
+    competitors: z.array(z.string().min(1)).default([]),
+    proofPoints: z.array(z.string().min(1)).default([]),
   }).default({
     name: "Unknown Brand",
     category: "General",
     oneLiner: "",
-    valueProp: ""
+    valueProp: "",
+    positioning: [],
+    competitors: [],
+    proofPoints: []
   })),
   tone: z.preprocess(ensureObject, z.object({
     adjectives: z.array(z.string().min(1)).default([]),
@@ -66,6 +96,9 @@ export const BrandDnaSchema = z.object({
   })),
   audience: z.preprocess(ensureObject, z.object({
     icpSummary: z.string().min(1).default("General Audience"),
+    industries: z.array(z.string().min(1)).default([]),
+    companySizes: z.array(z.string().min(1)).default([]),
+    geos: z.array(z.string().min(1)).default([]),
     personas: z
       .array(
         z.object({
@@ -80,12 +113,19 @@ export const BrandDnaSchema = z.object({
     segments: z.array(z.string().min(1)).default([]),
   }).default({
     icpSummary: "General Audience",
+    industries: [],
+    companySizes: [],
+    geos: [],
     personas: [],
     segments: []
   })),
   offer: z.preprocess(ensureObject, z.object({
     keyBenefits: z.array(z.string().min(1)).default([]),
     differentiators: z.array(z.string().min(1)).default([]),
+    features: z.array(z.string().min(1)).default([]),
+    useCases: z.array(z.string().min(1)).default([]),
+    pricingModel: z.string().optional(),
+    onboarding: z.array(z.string().min(1)).default([]),
     objections: z
       .array(
         z.object({
@@ -97,14 +137,19 @@ export const BrandDnaSchema = z.object({
   }).default({
     keyBenefits: [],
     differentiators: [],
+    features: [],
+    useCases: [],
+    onboarding: [],
     objections: []
   })),
   constraints: z.preprocess(ensureObject, z.object({
     complianceNotes: z.array(z.string().min(1)).default([]),
     claimsToAvoid: z.array(z.string().min(1)).default([]),
+    requiredDisclaimers: z.array(z.string().min(1)).default([]),
   }).default({
     complianceNotes: [],
-    claimsToAvoid: []
+    claimsToAvoid: [],
+    requiredDisclaimers: []
   })),
 });
 
