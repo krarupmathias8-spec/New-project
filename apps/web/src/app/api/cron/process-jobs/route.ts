@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { env } from "@/lib/env";
+import { getEnv } from "@/lib/env";
 import { recoverStuckJobs, processNextJobs } from "@/jobs/runner";
 
 function unauthorized() {
@@ -8,6 +8,7 @@ function unauthorized() {
 }
 
 async function handler(req: Request) {
+  const env = getEnv();
   // Auth (Vercel Cron recommended pattern):
   // - Real Vercel Cron invocations include the `x-vercel-cron` header.
   // - For manual/debug invocations, use Authorization: Bearer <CRON_SECRET>.

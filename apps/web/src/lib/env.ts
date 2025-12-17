@@ -3,9 +3,12 @@ import { z } from "zod";
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
 
-  DATABASE_URL: z.string().min(1),
+  // NOTE: Optional to allow `next build` in environments that don't provide runtime secrets.
+  // Runtime code that needs DB access should still expect this to be set.
+  DATABASE_URL: z.string().min(1).optional(),
 
-  AUTH_SECRET: z.string().min(1),
+  // NOTE: Optional to allow builds without auth secrets.
+  AUTH_SECRET: z.string().min(1).optional(),
   NEXTAUTH_URL: z.string().url().optional(),
   NEXTAUTH_SECRET: z.string().min(1).optional(),
   GOOGLE_CLIENT_ID: z.string().min(1).optional(),
@@ -33,6 +36,3 @@ export function getEnv(): Env {
   }
   return parsed.data;
 }
-
-export const env = getEnv();
-

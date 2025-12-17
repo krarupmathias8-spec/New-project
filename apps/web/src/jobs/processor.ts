@@ -148,28 +148,78 @@ export async function runGenerationJob(payload: { generationRunId: string; type:
 export async function runImagesJob(payload: { generationRunId: string; formats: ImageFormat[] }) {
   const run = await prisma.generationRun.findUnique({
     where: { id: payload.generationRunId },
-    select: { id: true, type: true, brandDna: { select: { dna: true } } },
+    select: { id: true, type: true, output: true, parameters: true, brandDna: { select: { dna: true } } },
   });
   if (!run) throw new Error("generation_run_not_found");
 
-  for (const format of payload.formats) {
-    const img = await generateAdImage({
-      creativeType: run.type,
-      brandDna: run.brandDna.dna,
-      format,
-    });
+  const params = (run.parameters ?? {}) as unknown;
+  const paramsObj = params && typeof params === "object" && !Array.isArray(params) ? (params as Record<string, unknown>) : {};
+  const requestedCount = typeof paramsObj.creativeCount === "number" ? paramsObj.creativeCount : Number(paramsObj.creativeCount);
+  const creativeCount = Number.isFinite(requestedCount) ? Math.min(6, Math.max(1, Math.floor(requestedCount))) : 4;
+  const useBrandAssets = paramsObj.useBrandAssets === false ? false : true;
 
-    await prisma.visualAsset.create({
-      data: {
-        generationRunId: run.id,
+  const out = (run.output ?? {}) as unknown;
+  const outObj = out && typeof out === "object" && !Array.isArray(out) ? (out as Record<string, unknown>) : {};
+
+  const variants: Array<{ index: number; angle?: string; headline?: string }> = [];
+
+  if (run.type === "META_ADS" && Array.isArray(outObj.ads)) {
+    const ads = outObj.ads as unknown[];
+    for (let i = 0; i < Math.min(creativeCount, ads.length); i++) {
+      const ad = ads[i] && typeof ads[i] === "object" ? (ads[i] as Record<string, unknown>) : {};
+      variants.push({
+        index: i,
+        angle: typeof ad.angle === "string" ? ad.angle : undefined,
+        headline: typeof ad.headline === "string" ? ad.headline : undefined,
+      });
+    }
+  } else if (run.type === "GOOGLE_ADS" && Array.isArray(outObj.campaigns)) {
+    const campaigns = outObj.campaigns as unknown[];
+    for (let i = 0; i < Math.min(creativeCount, campaigns.length); i++) {
+      const c = campaigns[i] && typeof campaigns[i] === "object" ? (campaigns[i] as Record<string, unknown>) : {};
+      const headlines = Array.isArray(c.headlines) ? (c.headlines as unknown[]).map(String) : [];
+      variants.push({
+        index: i,
+        angle: typeof c.angle === "string" ? c.angle : undefined,
+        headline: headlines[0] ? String(headlines[0]) : undefined,
+      });
+    }
+  }
+
+  if (variants.length === 0) {
+    for (let i = 0; i < creativeCount; i++) variants.push({ index: i });
+  }
+
+  for (const variant of variants) {
+    for (const format of payload.formats) {
+      const img = await generateAdImage({
+        creativeType: run.type,
+        brandDna: run.brandDna.dna,
         format,
-        width: img.width,
-        height: img.height,
-        prompt: img.prompt,
-        resultUrl: img.resultUrl ?? undefined,
-        openaiImageId: img.openaiImageId,
-      },
-    });
+        variant,
+        useBrandAssets,
+      });
+
+      const meta = {
+        variantIndex: variant.index,
+        angle: variant.angle,
+        headline: variant.headline,
+        usedAssets: (img as unknown as { usedAssets?: unknown }).usedAssets ?? null,
+      };
+
+      await prisma.visualAsset.create({
+        data: {
+          generationRunId: run.id,
+          format,
+          width: img.width,
+          height: img.height,
+          prompt: img.prompt,
+          negativePrompt: JSON.stringify(meta),
+          resultUrl: img.resultUrl ?? undefined,
+          openaiImageId: img.openaiImageId,
+        },
+      });
+    }
   }
 }
 

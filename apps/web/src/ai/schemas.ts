@@ -163,7 +163,12 @@ export const CreativeOutputSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("MARKETING_EMAIL"),
-    email: EmailSchema.default({}),
+    email: EmailSchema.default({
+      angle: "Angle",
+      subjectLines: ["Subject"],
+      previewText: "Preview",
+      bodyMarkdown: "Body",
+    }),
   }),
   z.object({
     type: z.literal("SOCIAL_POSTS"),

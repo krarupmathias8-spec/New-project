@@ -1,12 +1,11 @@
 import Link from "next/link";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { env } from "@/lib/env";
 import { SignInForm } from "./SignInForm";
 
 export default function SignInPage() {
   const callbackUrl = "/dashboard";
-  const showGoogle = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+  const showGoogle = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">

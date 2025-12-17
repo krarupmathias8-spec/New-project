@@ -31,6 +31,7 @@ export function ProjectActions({
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<string>("");
+  const [creativeCount, setCreativeCount] = useState<number>(4);
 
   return (
     <Card className="shadow-soft">
@@ -56,6 +57,25 @@ export function ProjectActions({
           />
           <div className="text-xs text-muted-foreground">
             These notes are passed to the generation job and stored in run parameters.
+          </div>
+        </div>
+
+        <div className="grid gap-2 sm:max-w-xs">
+          <Label htmlFor="creative-count">Number of creatives (4–6 recommended)</Label>
+          <Input
+            id="creative-count"
+            type="number"
+            min={1}
+            max={6}
+            value={creativeCount}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setCreativeCount(Number.isFinite(n) ? Math.min(6, Math.max(1, Math.floor(n))) : 4);
+            }}
+            disabled={Boolean(loading)}
+          />
+          <div className="text-xs text-muted-foreground">
+            For Meta/Google, we generate up to this many distinct angles and create images in 1:1, 4:5, and 16:9.
           </div>
         </div>
 
@@ -103,6 +123,8 @@ export function ProjectActions({
                       type: t.value,
                       parameters: {
                         notes: notes.trim() ? notes.trim() : undefined,
+                        creativeCount,
+                        useBrandAssets: true,
                         // Override if needed: imageFormats: ["SQUARE_1_1","PORTRAIT_4_5","LANDSCAPE_16_9"]
                       },
                     }),
