@@ -98,13 +98,18 @@ export async function runGenerationJob(payload: { generationRunId: string; type:
 
     const run = await prisma.generationRun.findUnique({
       where: { id: payload.generationRunId },
-      select: { id: true, type: true, brandDna: { select: { dna: true } } },
+      select: { id: true, type: true, parameters: true, brandDna: { select: { dna: true } } },
     });
     if (!run) throw new Error("generation_run_not_found");
+
+    const params = (run.parameters ?? {}) as unknown;
+    const paramsObj = params && typeof params === "object" && !Array.isArray(params) ? (params as Record<string, unknown>) : {};
+    const notes = typeof paramsObj.notes === "string" && paramsObj.notes.trim() ? paramsObj.notes.trim() : undefined;
 
     const generated = await generateCreatives({
       type: run.type,
       brandDna: run.brandDna.dna,
+      notes,
     });
 
     await prisma.generationRun.update({
@@ -119,7 +124,11 @@ export async function runGenerationJob(payload: { generationRunId: string; type:
     });
 
     // Auto-enqueue images (optional).
-    const formats: ImageFormat[] = ["SQUARE_1_1", "PORTRAIT_4_5", "LANDSCAPE_16_9"];
+    const maybeFormats = paramsObj.imageFormats;
+    const formats: ImageFormat[] =
+      Array.isArray(maybeFormats) && maybeFormats.every((v) => typeof v === "string")
+        ? (maybeFormats as ImageFormat[])
+        : ["SQUARE_1_1", "PORTRAIT_4_5", "LANDSCAPE_16_9"];
     await enqueueJob({
       type: "IMAGES",
       payload: { generationRunId: run.id, formats },

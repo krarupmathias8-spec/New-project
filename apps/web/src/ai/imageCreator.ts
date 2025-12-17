@@ -40,21 +40,29 @@ export function buildImagePrompt(args: {
   const b = asRecord(dna.brand);
   const t = asRecord(dna.tone);
   const a = asRecord(dna.audience);
+  const offer = asRecord(dna.offer);
+  const constraints = asRecord(dna.constraints);
 
   const prefer = Array.isArray(t.wordsToPrefer) ? (t.wordsToPrefer as string[]).slice(0, 8).join(", ") : "";
   const avoid = Array.isArray(t.wordsToAvoid) ? (t.wordsToAvoid as string[]).slice(0, 8).join(", ") : "";
   const adjectives = Array.isArray(t.adjectives) ? (t.adjectives as string[]).join(", ") : "";
+  const keyBenefits = Array.isArray(offer.keyBenefits) ? (offer.keyBenefits as string[]).slice(0, 6).join(", ") : "";
+  const claimsToAvoid = Array.isArray(constraints.claimsToAvoid)
+    ? (constraints.claimsToAvoid as string[]).slice(0, 8).join(", ")
+    : "";
 
   return `
-Create a high-performing B2B ad image concept for a brand.
+Create a high-performing paid ads image for a brand.
 
 Brand: ${String(b.name ?? "Unknown")}
 Category: ${String(b.category ?? "Unknown")}
 Value prop: ${String(b.valueProp ?? "")}
 Audience: ${String(a.icpSummary ?? "")}
+Key benefits (if any): ${keyBenefits}
 Tone adjectives: ${adjectives}
 Preferred words: ${prefer}
 Words to avoid: ${avoid}
+Claims to avoid (if any): ${claimsToAvoid}
 
 Creative type: ${args.creativeType}
 Format: ${args.format}
@@ -64,6 +72,7 @@ Art direction:
 - strong contrast and readable hierarchy
 - no logos, no brand names, no watermarks
 - no text baked into the image (we overlay copy in UI)
+- avoid disallowed claims and sensitive topics
 
 Return a single image matching the direction.
 `.trim();
@@ -76,8 +85,8 @@ export async function generateAdImage(args: {
 }) {
   const client = getOpenAI();
   const { OPENAI_IMAGE_MODEL } = getEnv();
-  // Use dall-e-3 by default for best quality
-  const model = OPENAI_IMAGE_MODEL ?? "dall-e-3";
+  // Prefer modern image model by default. Some accounts require org verification.
+  const model = OPENAI_IMAGE_MODEL ?? "gpt-image-1";
 
   const prompt = buildImagePrompt(args);
   const { width, height, size } = formatToSize(args.format);
@@ -86,7 +95,9 @@ export async function generateAdImage(args: {
     model,
     prompt,
     size,
-    quality: "standard", // or "hd" for even better quality
+    // NOTE: Different models accept different quality enums. We intentionally keep this permissive.
+    quality: model === "gpt-image-1" ? ("high" as unknown as "standard") : ("hd" as unknown as "standard"),
+    output_format: "png" as unknown as undefined,
     n: 1,
   })) as unknown;
 
