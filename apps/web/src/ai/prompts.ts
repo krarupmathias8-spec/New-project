@@ -36,6 +36,8 @@ Output requirements:
 - Fill ALL core sections: brand, audience, offer, tone, constraints, assets.
 - Prefer brand.name from og:site_name / application-name / JSON-LD Organization.name if present in content.
 - If you infer industry/businessModel, cite the exact wording that supports it.
+- For brand.businessModel, you MUST output exactly one of: marketplace, saas, agency, ecommerce, media, services, other.
+- If unsure, use "other".
 - Populate citations[] with entries like:
   { "field": "brand.name", "url": "<page url>", "quote": "<short quote>", "confidence": 0.8 }
 `.trim();

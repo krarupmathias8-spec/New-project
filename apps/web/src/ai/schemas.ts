@@ -63,7 +63,20 @@ export const BrandDnaSchema = z.object({
     category: z.string().min(1).default("General"), // human-friendly category
     industry: z.string().min(1).optional(), // ex: "M&A marketplace"
     businessModel: z
-      .enum(["marketplace", "saas", "agency", "ecommerce", "media", "services", "other"])
+      .preprocess((val) => {
+        if (val == null) return undefined;
+        const raw = typeof val === "string" ? val.trim().toLowerCase() : "";
+        if (!raw) return undefined;
+        // Normalize common variants/synonyms to our canonical set.
+        if (raw.includes("market")) return "marketplace";
+        if (raw.includes("saas") || raw.includes("software as a service")) return "saas";
+        if (raw.includes("agency") || raw.includes("studio")) return "agency";
+        if (raw.includes("ecommerce") || raw.includes("e-commerce") || raw.includes("shop") || raw.includes("store"))
+          return "ecommerce";
+        if (raw.includes("media") || raw.includes("publisher") || raw.includes("newsletter")) return "media";
+        if (raw.includes("service") || raw.includes("consult")) return "services";
+        return "other";
+      }, z.enum(["marketplace", "saas", "agency", "ecommerce", "media", "services", "other"]))
       .optional(),
     tagline: z.string().optional(),
     description: z.string().optional(),
