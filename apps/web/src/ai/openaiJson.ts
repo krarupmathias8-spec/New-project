@@ -12,7 +12,8 @@ export async function generateStructuredJson<TSchema extends z.ZodTypeAny>(args:
 }) {
   const client = getOpenAI();
   const { OPENAI_TEXT_MODEL } = getEnv();
-  const model = args.model ?? OPENAI_TEXT_MODEL ?? "gpt-4.1";
+  // Use gpt-4o by default for best quality and JSON reliability
+  const model = args.model ?? OPENAI_TEXT_MODEL ?? "gpt-4o";
 
   const completion = await client.chat.completions.create({
     model,
@@ -45,4 +46,3 @@ export async function generateStructuredJson<TSchema extends z.ZodTypeAny>(args:
     model,
   };
 }
-

@@ -23,9 +23,9 @@ function formatToSize(format: ImageFormat): { width: number; height: number; siz
       return { width: 1024, height: 1024, size: "1024x1024" };
     case "PORTRAIT_4_5":
       // closest allowed size for most image APIs
-      return { width: 1024, height: 1536, size: "1024x1536" };
+      return { width: 1024, height: 1792, size: "1024x1792" };
     case "LANDSCAPE_16_9":
-      return { width: 1536, height: 1024, size: "1536x1024" };
+      return { width: 1792, height: 1024, size: "1792x1024" };
     default:
       return { width: 1024, height: 1024, size: "1024x1024" };
   }
@@ -76,7 +76,8 @@ export async function generateAdImage(args: {
 }) {
   const client = getOpenAI();
   const { OPENAI_IMAGE_MODEL } = getEnv();
-  const model = OPENAI_IMAGE_MODEL ?? "gpt-image-1";
+  // Use dall-e-3 by default for best quality
+  const model = OPENAI_IMAGE_MODEL ?? "dall-e-3";
 
   const prompt = buildImagePrompt(args);
   const { width, height, size } = formatToSize(args.format);
@@ -85,13 +86,14 @@ export async function generateAdImage(args: {
     model,
     prompt,
     size,
+    quality: "standard", // or "hd" for even better quality
+    n: 1,
   })) as unknown;
 
   const first = (res as { data?: Array<{ b64_json?: string; url?: string }> })?.data?.[0];
   const b64 = first?.b64_json;
   const url = first?.url;
 
-  // MVP: keep a data URL if no hosted URL is returned.
   const resultUrl = url ?? (b64 ? `data:image/png;base64,${b64}` : null);
 
   return {
@@ -103,4 +105,3 @@ export async function generateAdImage(args: {
     openaiImageId: undefined,
   };
 }
-
