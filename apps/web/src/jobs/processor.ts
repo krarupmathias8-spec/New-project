@@ -105,11 +105,15 @@ export async function runGenerationJob(payload: { generationRunId: string; type:
     const params = (run.parameters ?? {}) as unknown;
     const paramsObj = params && typeof params === "object" && !Array.isArray(params) ? (params as Record<string, unknown>) : {};
     const notes = typeof paramsObj.notes === "string" && paramsObj.notes.trim() ? paramsObj.notes.trim() : undefined;
+    const requestedCount =
+      typeof paramsObj.creativeCount === "number" ? paramsObj.creativeCount : Number(paramsObj.creativeCount);
+    const creativeCount = Number.isFinite(requestedCount) ? Math.min(6, Math.max(1, Math.floor(requestedCount))) : undefined;
 
     const generated = await generateCreatives({
       type: run.type,
       brandDna: run.brandDna.dna,
       notes,
+      creativeCount,
     });
 
     await prisma.generationRun.update({

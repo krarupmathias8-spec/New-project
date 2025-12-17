@@ -49,7 +49,21 @@ export function creativeEngineUserPrompt(args: {
   type: CreativeType;
   brandDna: unknown;
   notes?: string;
+  creativeCount?: number;
 }) {
+  const count = typeof args.creativeCount === "number" && Number.isFinite(args.creativeCount)
+    ? Math.min(6, Math.max(1, Math.floor(args.creativeCount)))
+    : undefined;
+
+  const countInstruction =
+    args.type === "META_ADS"
+      ? `Generate ${count ?? 4} distinct ads (array "ads"), each with different angles.`
+      : args.type === "GOOGLE_ADS"
+        ? `Generate ${count ?? 4} distinct campaigns (array "campaigns"), each with different angles.`
+        : count
+          ? `Generate at least ${count} distinct items/angles for this creative type.`
+          : `Generate multiple distinct angles for this creative type.`;
+
   return `
 Generate creatives for the specific type: "${args.type}".
 
@@ -60,6 +74,9 @@ Your output JSON must start with:
   ...
 }
 followed by the specific fields for this creative type.
+
+Quantity requirement:
+${countInstruction}
 
 Brand DNA (JSON):
 ${JSON.stringify(args.brandDna, null, 2)}
