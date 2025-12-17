@@ -53,6 +53,8 @@ Rules:
 - Follow the brand tone, forbidden/preferred words, and compliance constraints.
 - Avoid fluff; optimize for clarity and conversion.
 - Create multiple distinct angles; avoid near-duplicates.
+- Never output placeholders like "Ad Text", "Description", "Headline", "Default Angle", or "General".
+- Each creative must include at least one concrete detail from Brand DNA (industry, offer, feature, use case, audience, etc.).
 `.trim();
 
 export function creativeEngineUserPrompt(args: {

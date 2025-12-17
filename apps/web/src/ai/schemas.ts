@@ -168,20 +168,25 @@ export const BrandDnaSchema = z.object({
 
 export type BrandDna = z.infer<typeof BrandDnaSchema>;
 
+const notPlaceholder = (label: string) =>
+  z.string().min(1).refine((v) => !/^(ad text|headline|description|default angle|general)$/i.test(v.trim()), {
+    message: `${label} must not be a placeholder`,
+  });
+
 const MetaAdSchema = z.object({
-  angle: z.string().min(1).default("Default Angle"),
-  audienceSegment: z.string().min(1).default("General"),
-  primaryText: z.string().min(1).default("Ad Text"),
-  headline: z.string().min(1).default("Headline"),
-  description: z.string().min(1).default("Description"),
-  cta: z.string().min(1).default("Learn More"),
+  angle: notPlaceholder("angle").min(4),
+  audienceSegment: notPlaceholder("audienceSegment").min(3),
+  primaryText: notPlaceholder("primaryText").min(40),
+  headline: notPlaceholder("headline").min(8),
+  description: notPlaceholder("description").min(12),
+  cta: z.string().min(2),
 });
 
 const GoogleAdSchema = z.object({
-  angle: z.string().min(1).default("Angle"),
-  headlines: z.array(z.string().min(1)).min(1).default(["Headline"]),
-  descriptions: z.array(z.string().min(1)).min(1).default(["Description"]),
-  keywords: z.array(z.string().min(1)).min(1).default(["keyword"]),
+  angle: notPlaceholder("angle").min(4),
+  headlines: z.array(notPlaceholder("headline").min(6)).min(5),
+  descriptions: z.array(notPlaceholder("description").min(20)).min(3),
+  keywords: z.array(z.string().min(2)).min(5),
 });
 
 const TikTokHookSchema = z.object({
@@ -209,11 +214,11 @@ const SocialPostSchema = z.object({
 export const CreativeOutputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("META_ADS"),
-    ads: z.array(MetaAdSchema).min(1).default([]),
+    ads: z.array(MetaAdSchema).min(1),
   }),
   z.object({
     type: z.literal("GOOGLE_ADS"),
-    campaigns: z.array(GoogleAdSchema).min(1).default([]),
+    campaigns: z.array(GoogleAdSchema).min(1),
   }),
   z.object({
     type: z.literal("TIKTOK_HOOKS"),

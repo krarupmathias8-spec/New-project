@@ -268,13 +268,17 @@ export async function scrapeBrandSite(primaryUrl: string): Promise<ScrapeResult>
   for (const url of urls) {
     try {
       let html = await fetchHtml(url, 18_000);
-      // If HTML is too empty (SPA), try Browserless rendering.
-      if (!html || html.length < 1500) {
+      let { title, content } = extractText(html);
+
+      // If content is low-signal (common for SPAs even with large HTML), try Browserless.
+      if (!content || content.length < 800) {
         const rendered = await fetchHtmlWithBrowserless(url);
-        if (rendered) html = rendered;
+        if (rendered) {
+          html = rendered;
+          ({ title, content } = extractText(html));
+        }
       }
 
-      const { title, content } = extractText(html);
       // Lower threshold: meta/headings can still be valuable even if body text is short.
       if (!content || content.length < 80) continue;
 
