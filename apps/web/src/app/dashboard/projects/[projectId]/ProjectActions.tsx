@@ -31,7 +31,7 @@ export function ProjectActions({
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<string>("");
-  const [creativeCount, setCreativeCount] = useState<number>(4);
+  const [creativeCount, setCreativeCount] = useState<number>(1);
 
   return (
     <Card className="shadow-soft">
@@ -61,7 +61,7 @@ export function ProjectActions({
         </div>
 
         <div className="grid gap-2 sm:max-w-xs">
-          <Label htmlFor="creative-count">Number of creatives (4–6 recommended)</Label>
+          <Label htmlFor="creative-count">Number of creatives</Label>
           <Input
             id="creative-count"
             type="number"
@@ -74,8 +74,37 @@ export function ProjectActions({
             }}
             disabled={Boolean(loading)}
           />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={creativeCount === 1 ? "default" : "outline"}
+              disabled={Boolean(loading)}
+              onClick={() => setCreativeCount(1)}
+            >
+              Test (1)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={creativeCount === 4 ? "default" : "outline"}
+              disabled={Boolean(loading)}
+              onClick={() => setCreativeCount(4)}
+            >
+              4
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={creativeCount === 6 ? "default" : "outline"}
+              disabled={Boolean(loading)}
+              onClick={() => setCreativeCount(6)}
+            >
+              6
+            </Button>
+          </div>
           <div className="text-xs text-muted-foreground">
-            For Meta/Google, we generate up to this many distinct angles and create images in 1:1, 4:5, and 16:9.
+            We generate this many distinct angles and create images in 1:1, 4:5, and 16:9 (so 1 creative = 3 images).
           </div>
         </div>
 
