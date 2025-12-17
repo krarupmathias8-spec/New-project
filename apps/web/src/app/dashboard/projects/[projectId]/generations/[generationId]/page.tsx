@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AutoRefresh } from "./AutoRefresh";
+import { ProcessJobsButton } from "./ProcessJobsButton";
 
 function asObj(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -254,7 +255,10 @@ export default async function GenerationPage({
         <CardContent>
           {gen.visualAssets.length === 0 ? (
             <div className="rounded-lg border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
-              {isImagesStillGenerating ? "Generating images…" : "No images generated for this run yet."}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>{isImagesStillGenerating ? "Generating images…" : "No images generated for this run yet."}</div>
+                {isImagesStillGenerating ? <ProcessJobsButton /> : null}
+              </div>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">

@@ -70,15 +70,34 @@ async function toPng(buf: Buffer): Promise<Buffer> {
 
 async function getBackgroundPng(args: { model: string; prompt: string; size: OpenAIImageSize }): Promise<Buffer> {
   const client = getOpenAI();
-  const res = (await client.images.generate({
-    model: args.model,
-    prompt: args.prompt,
-    size: args.size,
-    // We keep this permissive for cross-model compatibility.
-    quality: args.model === "gpt-image-1" ? ("high" as unknown as "standard") : ("hd" as unknown as "standard"),
-    output_format: "png" as unknown as undefined,
-    n: 1,
-  })) as unknown;
+  const call = async (model: string) => {
+    const base: Record<string, unknown> = {
+      model,
+      prompt: args.prompt,
+      size: args.size,
+      n: 1,
+    };
+    if (model === "gpt-image-1") {
+      base.quality = "high";
+      base.output_format = "png";
+    } else {
+      base.quality = "hd";
+    }
+    return (await client.images.generate(base as never)) as unknown;
+  };
+
+  let res: unknown;
+  try {
+    res = await call(args.model);
+  } catch (e) {
+    const msg = String((e as Error)?.message ?? e);
+    // Practical fallback so you still get creatives even if gpt-image-1 is unavailable.
+    if (args.model === "gpt-image-1" && /verify organization|must be verified|not allowed|model/i.test(msg)) {
+      res = await call("dall-e-3");
+    } else {
+      throw e;
+    }
+  }
 
   const first = (res as { data?: Array<{ b64_json?: string; url?: string }> })?.data?.[0];
   if (first?.b64_json) return Buffer.from(first.b64_json, "base64");
