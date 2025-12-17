@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import type { CreativeType } from "@/generated/prisma";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 const CREATIVE_TYPES: { label: string; value: CreativeType }[] = [
   { label: "Meta Ads", value: "META_ADS" },
@@ -28,12 +30,14 @@ export function ProjectActions({
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notes, setNotes] = useState<string>("");
+  const [creativeCount, setCreativeCount] = useState<number>(1);
 
   return (
     <Card className="shadow-soft">
       <CardHeader>
         <CardTitle>Actions</CardTitle>
-        <CardDescription>Ingest the site, then generate structured creatives.</CardDescription>
+        <CardDescription>Ingest the site, then generate structured creatives + images.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {error ? (
@@ -41,6 +45,68 @@ export function ProjectActions({
             {error}
           </div>
         ) : null}
+
+        <div className="grid gap-2">
+          <Label htmlFor="creative-notes">Creative brief (optional)</Label>
+          <Input
+            id="creative-notes"
+            placeholder='Ex: "Black Friday -20% pendant 7 jours", "cible: e-com", "ton: premium"'
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            disabled={Boolean(loading)}
+          />
+          <div className="text-xs text-muted-foreground">
+            These notes are passed to the generation job and stored in run parameters.
+          </div>
+        </div>
+
+        <div className="grid gap-2 sm:max-w-xs">
+          <Label htmlFor="creative-count">Number of creatives</Label>
+          <Input
+            id="creative-count"
+            type="number"
+            min={1}
+            max={6}
+            value={creativeCount}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setCreativeCount(Number.isFinite(n) ? Math.min(6, Math.max(1, Math.floor(n))) : 4);
+            }}
+            disabled={Boolean(loading)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={creativeCount === 1 ? "default" : "outline"}
+              disabled={Boolean(loading)}
+              onClick={() => setCreativeCount(1)}
+            >
+              Test (1)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={creativeCount === 4 ? "default" : "outline"}
+              disabled={Boolean(loading)}
+              onClick={() => setCreativeCount(4)}
+            >
+              4
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={creativeCount === 6 ? "default" : "outline"}
+              disabled={Boolean(loading)}
+              onClick={() => setCreativeCount(6)}
+            >
+              6
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            We generate this many distinct angles and create images in 1:1, 4:5, and 16:9 (so 1 creative = 3 images).
+          </div>
+        </div>
 
         <div className="flex flex-wrap gap-2">
           <Button
@@ -82,7 +148,15 @@ export function ProjectActions({
                   const res = await fetch(`/api/projects/${projectId}/generate`, {
                     method: "POST",
                     headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ type: t.value }),
+                    body: JSON.stringify({
+                      type: t.value,
+                      parameters: {
+                        notes: notes.trim() ? notes.trim() : undefined,
+                        creativeCount,
+                        useBrandAssets: true,
+                        // Override if needed: imageFormats: ["SQUARE_1_1","PORTRAIT_4_5","LANDSCAPE_16_9"]
+                      },
+                    }),
                   });
                   const json = (await res.json().catch(() => null)) as unknown;
                   if (!res.ok) {

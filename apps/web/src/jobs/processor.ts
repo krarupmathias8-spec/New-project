@@ -11,6 +11,126 @@ function now() {
   return new Date();
 }
 
+function asObj(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function asStr(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function uniqByUrl<T extends { url: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const it of items) {
+    if (!it.url) continue;
+    if (seen.has(it.url)) continue;
+    seen.add(it.url);
+    out.push(it);
+  }
+  return out;
+}
+
+function inferBrandNameFromPrimaryUrl(primaryUrl: string) {
+  try {
+    const host = new URL(primaryUrl).hostname.replace(/^www\./, "");
+    const base = host.split(".")[0] || host;
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  } catch {
+    return "Unknown Brand";
+  }
+}
+
+function inferBrandNameFromTitle(title?: string) {
+  if (!title) return null;
+  const cleaned = title.split("|")[0]?.split("–")[0]?.split("-")[0]?.trim();
+  return cleaned && cleaned.length >= 2 ? cleaned : null;
+}
+
+function shouldPreferDomainBrandName(domainName: string, existingName: string) {
+  const dn = domainName.toLowerCase();
+  const en = existingName.toLowerCase();
+  if (!existingName || existingName === "Unknown Brand") return true;
+  if (en.includes(dn)) return false;
+  // Heuristics: titles often contain taglines (e.g. "Verified Businesses for Sale")
+  if (existingName.length >= 26) return true;
+  if (/\b(for sale|for\s+\w+|buy|sell|verified|welcome|discover)\b/i.test(existingName)) return true;
+  return false;
+}
+
+function mergeScrapedAssetsIntoBrandDna(args: {
+  dna: unknown;
+  primaryUrl: string;
+  scraped: { pages: Array<{ title?: string }>; assets: Array<{ url: string; kind: string; alt?: string; sourcePageUrl: string }> };
+}) {
+  const dna = asObj(args.dna);
+  const brand = asObj(dna.brand);
+  const assets = asObj(dna.assets);
+
+  const scrapedLogos = uniqByUrl(
+    args.scraped.assets
+      .filter((a) => a.kind === "logo")
+      .map((a) => ({ url: a.url, alt: a.alt, sourcePageUrl: a.sourcePageUrl }))
+  );
+  const scrapedIcons = uniqByUrl(
+    args.scraped.assets
+      .filter((a) => a.kind === "icon")
+      .map((a) => ({ url: a.url, alt: a.alt, sourcePageUrl: a.sourcePageUrl }))
+  );
+  const scrapedProducts = uniqByUrl(
+    args.scraped.assets
+      .filter((a) => a.kind === "product_image")
+      .map((a) => ({ url: a.url, alt: a.alt, sourcePageUrl: a.sourcePageUrl }))
+  );
+  const scrapedOg = uniqByUrl(
+    args.scraped.assets
+      .filter((a) => a.kind === "og_image")
+      .map((a) => ({ url: a.url, sourcePageUrl: a.sourcePageUrl }))
+  );
+
+  const existingLogos = Array.isArray(assets.logos) ? (assets.logos as unknown[]) : [];
+  const existingIcons = Array.isArray(assets.icons) ? (assets.icons as unknown[]) : [];
+  const existingProducts = Array.isArray(assets.productImages) ? (assets.productImages as unknown[]) : [];
+  const existingOg = Array.isArray(assets.ogImages) ? (assets.ogImages as unknown[]) : [];
+
+  const mergedAssets = {
+    ...assets,
+    logos:
+      existingLogos.length > 0
+        ? existingLogos
+        : scrapedLogos,
+    icons: existingIcons.length > 0 ? existingIcons : scrapedIcons.map((i) => ({ url: i.url, sourcePageUrl: i.sourcePageUrl })),
+    productImages:
+      existingProducts.length > 0
+        ? existingProducts
+        : scrapedProducts,
+    ogImages:
+      existingOg.length > 0
+        ? existingOg
+        : scrapedOg,
+  };
+
+  // Also patch brand basics if the model left defaults.
+  const titleName = inferBrandNameFromTitle(args.scraped.pages?.[0]?.title ?? args.scraped.pages?.[1]?.title);
+  const domainName = inferBrandNameFromPrimaryUrl(args.primaryUrl);
+  const fallbackName = titleName ?? domainName;
+  const existingName = asStr(brand.name);
+  const patchedBrand = {
+    ...brand,
+    website: asStr(brand.website) ?? args.primaryUrl,
+    name:
+      existingName && !shouldPreferDomainBrandName(domainName, existingName)
+        ? existingName
+        : fallbackName,
+  };
+
+  return {
+    ...dna,
+    brand: patchedBrand,
+    assets: mergedAssets,
+  };
+}
+
 export async function runIngestionJob(payload: { ingestionRunId: string }) {
   try {
     await prisma.ingestionRun.update({
@@ -50,10 +170,16 @@ export async function runIngestionJob(payload: { ingestionRunId: string }) {
       assets,
     });
 
+    const mergedDna = mergeScrapedAssetsIntoBrandDna({
+      dna: analyzed.data,
+      primaryUrl: run.inputUrl,
+      scraped: { pages, assets },
+    });
+
     const brandDna = await prisma.brandDna.create({
       data: {
         projectId: run.projectId,
-        dna: analyzed.data as unknown as Prisma.InputJsonValue,
+        dna: mergedDna as unknown as Prisma.InputJsonValue,
         corpus,
       },
       select: { id: true },
@@ -98,13 +224,22 @@ export async function runGenerationJob(payload: { generationRunId: string; type:
 
     const run = await prisma.generationRun.findUnique({
       where: { id: payload.generationRunId },
-      select: { id: true, type: true, brandDna: { select: { dna: true } } },
+      select: { id: true, type: true, parameters: true, brandDna: { select: { dna: true } } },
     });
     if (!run) throw new Error("generation_run_not_found");
+
+    const params = (run.parameters ?? {}) as unknown;
+    const paramsObj = params && typeof params === "object" && !Array.isArray(params) ? (params as Record<string, unknown>) : {};
+    const notes = typeof paramsObj.notes === "string" && paramsObj.notes.trim() ? paramsObj.notes.trim() : undefined;
+    const requestedCount =
+      typeof paramsObj.creativeCount === "number" ? paramsObj.creativeCount : Number(paramsObj.creativeCount);
+    const creativeCount = Number.isFinite(requestedCount) ? Math.min(6, Math.max(1, Math.floor(requestedCount))) : undefined;
 
     const generated = await generateCreatives({
       type: run.type,
       brandDna: run.brandDna.dna,
+      notes,
+      creativeCount,
     });
 
     await prisma.generationRun.update({
@@ -119,7 +254,11 @@ export async function runGenerationJob(payload: { generationRunId: string; type:
     });
 
     // Auto-enqueue images (optional).
-    const formats: ImageFormat[] = ["SQUARE_1_1", "PORTRAIT_4_5", "LANDSCAPE_16_9"];
+    const maybeFormats = paramsObj.imageFormats;
+    const formats: ImageFormat[] =
+      Array.isArray(maybeFormats) && maybeFormats.every((v) => typeof v === "string")
+        ? (maybeFormats as ImageFormat[])
+        : ["SQUARE_1_1", "PORTRAIT_4_5", "LANDSCAPE_16_9"];
     await enqueueJob({
       type: "IMAGES",
       payload: { generationRunId: run.id, formats },
@@ -136,31 +275,143 @@ export async function runGenerationJob(payload: { generationRunId: string; type:
   }
 }
 
-export async function runImagesJob(payload: { generationRunId: string; formats: ImageFormat[] }) {
+export async function runImagesJob(payload: unknown) {
+  const p = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  const generationRunId = typeof p.generationRunId === "string" ? p.generationRunId : "";
+  if (!generationRunId) throw new Error("images_job_missing_generationRunId");
+
+  // Fan-out job: { generationRunId, formats: [...] }
+  if (Array.isArray(p.formats)) {
+    const run = await prisma.generationRun.findUnique({
+      where: { id: generationRunId },
+      select: { id: true, type: true, output: true, parameters: true },
+    });
+    if (!run) throw new Error("generation_run_not_found");
+
+    const params = (run.parameters ?? {}) as unknown;
+    const paramsObj = params && typeof params === "object" && !Array.isArray(params) ? (params as Record<string, unknown>) : {};
+    const requestedCount =
+      typeof paramsObj.creativeCount === "number" ? paramsObj.creativeCount : Number(paramsObj.creativeCount);
+    const creativeCount = Number.isFinite(requestedCount) ? Math.min(6, Math.max(1, Math.floor(requestedCount))) : 4;
+    const useBrandAssets = paramsObj.useBrandAssets === false ? false : true;
+
+    const out = (run.output ?? {}) as unknown;
+    const outObj = out && typeof out === "object" && !Array.isArray(out) ? (out as Record<string, unknown>) : {};
+    const variants: Array<{ index: number; angle?: string; headline?: string }> = [];
+
+    if (run.type === "META_ADS" && Array.isArray(outObj.ads)) {
+      const ads = outObj.ads as unknown[];
+      for (let i = 0; i < Math.min(creativeCount, ads.length); i++) {
+        const ad = ads[i] && typeof ads[i] === "object" ? (ads[i] as Record<string, unknown>) : {};
+        variants.push({
+          index: i,
+          angle: typeof ad.angle === "string" ? ad.angle : undefined,
+          headline: typeof ad.headline === "string" ? ad.headline : undefined,
+        });
+      }
+    } else if (run.type === "GOOGLE_ADS" && Array.isArray(outObj.campaigns)) {
+      const campaigns = outObj.campaigns as unknown[];
+      for (let i = 0; i < Math.min(creativeCount, campaigns.length); i++) {
+        const c = campaigns[i] && typeof campaigns[i] === "object" ? (campaigns[i] as Record<string, unknown>) : {};
+        const headlines = Array.isArray(c.headlines) ? (c.headlines as unknown[]).map(String) : [];
+        variants.push({
+          index: i,
+          angle: typeof c.angle === "string" ? c.angle : undefined,
+          headline: headlines[0] ? String(headlines[0]) : undefined,
+        });
+      }
+    }
+
+    if (variants.length === 0) {
+      for (let i = 0; i < creativeCount; i++) variants.push({ index: i });
+    }
+
+    const formats = (p.formats as unknown[])
+      .map((v) => (typeof v === "string" ? v : null))
+      .filter(Boolean) as ImageFormat[];
+
+    for (const variant of variants) {
+      for (const format of formats) {
+        await enqueueJob({
+          type: "IMAGES",
+          payload: { generationRunId: run.id, format, variant, useBrandAssets },
+        });
+      }
+    }
+    return;
+  }
+
+  // Single image job: { generationRunId, format, variant, useBrandAssets }
+  const format = typeof p.format === "string" ? (p.format as ImageFormat) : null;
+  const variant = p.variant && typeof p.variant === "object" ? (p.variant as Record<string, unknown>) : null;
+  const variantIndex = variant && typeof variant.index === "number" ? variant.index : Number(variant?.index);
+  const useBrandAssets = p.useBrandAssets === false ? false : true;
+  if (!format || !Number.isFinite(variantIndex)) throw new Error("images_job_invalid_payload");
+
   const run = await prisma.generationRun.findUnique({
-    where: { id: payload.generationRunId },
-    select: { id: true, type: true, brandDna: { select: { dna: true } } },
+    where: { id: generationRunId },
+    select: {
+      id: true,
+      type: true,
+      project: { select: { primaryUrl: true } },
+      brandDna: { select: { id: true, dna: true } },
+    },
   });
   if (!run) throw new Error("generation_run_not_found");
 
-  for (const format of payload.formats) {
-    const img = await generateAdImage({
-      creativeType: run.type,
-      brandDna: run.brandDna.dna,
-      format,
-    });
+  // Self-heal: if Brand DNA doesn't include assets (common), re-scrape and patch it once.
+  let brandDna = run.brandDna.dna as unknown;
+  const dnaAssets = asObj(asObj(brandDna).assets);
+  const hasAnyAssets =
+    (Array.isArray(dnaAssets.logos) && dnaAssets.logos.length > 0) ||
+    (Array.isArray(dnaAssets.productImages) && dnaAssets.productImages.length > 0) ||
+    (Array.isArray(dnaAssets.ogImages) && dnaAssets.ogImages.length > 0);
 
-    await prisma.visualAsset.create({
-      data: {
-        generationRunId: run.id,
-        format,
-        width: img.width,
-        height: img.height,
-        prompt: img.prompt,
-        resultUrl: img.resultUrl ?? undefined,
-        openaiImageId: img.openaiImageId,
-      },
+  if (!hasAnyAssets && run.project?.primaryUrl) {
+    const scraped = await scrapeBrandSite(run.project.primaryUrl);
+    brandDna = mergeScrapedAssetsIntoBrandDna({
+      dna: brandDna,
+      primaryUrl: run.project.primaryUrl,
+      scraped: { pages: scraped.pages, assets: scraped.assets },
+    });
+    await prisma.brandDna.update({
+      where: { id: run.brandDna.id },
+      data: { dna: brandDna as unknown as Prisma.InputJsonValue },
     });
   }
+
+  const v = {
+    index: Math.floor(Number(variantIndex)),
+    angle: typeof variant?.angle === "string" ? (variant.angle as string) : undefined,
+    headline: typeof variant?.headline === "string" ? (variant.headline as string) : undefined,
+  };
+
+  const img = await generateAdImage({
+    creativeType: run.type,
+    brandDna,
+    format,
+    variant: v,
+    useBrandAssets,
+  });
+
+  const meta = {
+    variantIndex: v.index,
+    angle: v.angle,
+    headline: v.headline,
+    usedAssets: (img as unknown as { usedAssets?: unknown }).usedAssets ?? null,
+  };
+
+  await prisma.visualAsset.create({
+    data: {
+      generationRunId: run.id,
+      format,
+      width: img.width,
+      height: img.height,
+      prompt: img.prompt,
+      negativePrompt: JSON.stringify(meta),
+      resultUrl: img.resultUrl ?? undefined,
+      openaiImageId: img.openaiImageId,
+    },
+  });
 }
 

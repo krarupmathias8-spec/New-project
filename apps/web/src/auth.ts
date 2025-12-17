@@ -6,12 +6,14 @@ import { compare } from "bcryptjs";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
-import { env } from "@/lib/env";
+import { getEnv } from "@/lib/env";
 
 const CredentialsSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
+
+const env = getEnv();
 
 export const authConfig = {
   adapter: PrismaAdapter(prisma),

@@ -65,6 +65,42 @@ function absolutizeUrl(baseUrl: string, maybeUrl: string) {
   }
 }
 
+function safeJsonParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function asObj(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function asStr(value: unknown): string {
+  return typeof value === "string" ? normalizeText(value) : "";
+}
+
+function extractJsonLd(html: string): Array<Record<string, unknown>> {
+  const $ = cheerio.load(html);
+  const out: Array<Record<string, unknown>> = [];
+  $('script[type="application/ld+json"]').each((_i, el) => {
+    const raw = $(el).text();
+    const parsed = safeJsonParse(raw);
+    if (!parsed) return;
+    if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        const o = asObj(item);
+        if (Object.keys(o).length) out.push(o);
+      }
+      return;
+    }
+    const o = asObj(parsed);
+    if (Object.keys(o).length) out.push(o);
+  });
+  return out;
+}
+
 function extractAssets(html: string, pageUrl: string): ExtractedAsset[] {
   const $ = cheerio.load(html);
   const out: ExtractedAsset[] = [];
@@ -88,6 +124,28 @@ function extractAssets(html: string, pageUrl: string): ExtractedAsset[] {
   if (ogImage) {
     const abs = absolutizeUrl(pageUrl, ogImage);
     if (abs) out.push({ url: abs, kind: "og_image", sourcePageUrl: pageUrl });
+  }
+
+  // JSON-LD logos (Organization / WebSite)
+  const jsonLd = extractJsonLd(html);
+  for (const node of jsonLd) {
+    const logo = asObj(node.logo);
+    const logoUrl =
+      asStr(node.logo) ||
+      asStr(logo.url) ||
+      asStr(logo["@id"]);
+    if (logoUrl) {
+      const abs = absolutizeUrl(pageUrl, logoUrl);
+      if (abs) out.push({ url: abs, kind: "logo", sourcePageUrl: pageUrl });
+    }
+    // Some schemas put the organization under publisher
+    const publisher = asObj(node.publisher);
+    const pubLogo = asObj(publisher.logo);
+    const pubLogoUrl = asStr(pubLogo.url) || asStr(pubLogo["@id"]) || asStr(publisher.logo);
+    if (pubLogoUrl) {
+      const abs = absolutizeUrl(pageUrl, pubLogoUrl);
+      if (abs) out.push({ url: abs, kind: "logo", sourcePageUrl: pageUrl });
+    }
   }
 
   // Images
@@ -139,6 +197,19 @@ function extractText(html: string): { title?: string; content: string } {
   const ogTitle =
     pickMeta($, 'meta[property="og:title"]') || pickMeta($, 'meta[name="twitter:title"]');
 
+  const ogSiteName = pickMeta($, 'meta[property="og:site_name"]');
+  const applicationName = pickMeta($, 'meta[name="application-name"]');
+  const ogType = pickMeta($, 'meta[property="og:type"]');
+  const keywords = pickMeta($, 'meta[name="keywords"]');
+
+  const jsonLd = extractJsonLd(html);
+  const orgNode =
+    jsonLd.find((n) => /organization/i.test(asStr(n["@type"]))) ??
+    jsonLd.find((n) => /website/i.test(asStr(n["@type"])));
+  const orgName = orgNode ? asStr(orgNode.name) : "";
+  const orgDesc = orgNode ? asStr(orgNode.description) : "";
+  const orgCategory = orgNode ? asStr(orgNode.category) : "";
+
   const headings = normalizeText($("h1,h2,h3").text());
 
   // If it's a SPA, body text might be minimal; <noscript> sometimes contains useful text.
@@ -148,7 +219,14 @@ function extractText(html: string): { title?: string; content: string } {
   const parts = [
     title ?? "",
     ogTitle,
+    ogSiteName,
+    applicationName,
+    ogType,
     metaDescription,
+    keywords,
+    orgName,
+    orgCategory,
+    orgDesc,
     headings,
     raw,
     noScript,
@@ -169,6 +247,14 @@ export function getCandidateUrls(primaryUrl: string): string[] {
     `${base}/about-us`,
     `${base}/faq`,
     `${base}/features`,
+    `${base}/contact`,
+    `${base}/contact-us`,
+    `${base}/how-it-works`,
+    `${base}/solutions`,
+    `${base}/services`,
+    `${base}/products`,
+    `${base}/marketplace`,
+    `${base}/listings`,
   ];
   // de-dupe while keeping order
   return [...new Set(candidates.map((x) => new URL(x, base).toString()))];
@@ -182,13 +268,17 @@ export async function scrapeBrandSite(primaryUrl: string): Promise<ScrapeResult>
   for (const url of urls) {
     try {
       let html = await fetchHtml(url, 18_000);
-      // If HTML is too empty (SPA), try Browserless rendering.
-      if (!html || html.length < 1500) {
+      let { title, content } = extractText(html);
+
+      // If content is low-signal (common for SPAs even with large HTML), try Browserless.
+      if (!content || content.length < 800) {
         const rendered = await fetchHtmlWithBrowserless(url);
-        if (rendered) html = rendered;
+        if (rendered) {
+          html = rendered;
+          ({ title, content } = extractText(html));
+        }
       }
 
-      const { title, content } = extractText(html);
       // Lower threshold: meta/headings can still be valuable even if body text is short.
       if (!content || content.length < 80) continue;
 
@@ -210,8 +300,8 @@ export async function scrapeBrandSite(primaryUrl: string): Promise<ScrapeResult>
 
   // Keep at most N pages to bound token cost and avoid timeouts on Vercel.
   return {
-    pages: pages.slice(0, 4),
-    assets: assets.slice(0, 60),
+    pages: pages.slice(0, 8),
+    assets: assets.slice(0, 120),
   };
 }
 

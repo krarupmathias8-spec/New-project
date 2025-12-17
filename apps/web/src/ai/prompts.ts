@@ -2,13 +2,14 @@ import type { CreativeType } from "@/generated/prisma";
 
 export const SYSTEM_BRAND_ANALYZER = `
 You are a senior brand strategist and B2B performance marketer.
-Your job: infer a structured "Brand DNA" from public website text.
+Your job: extract and infer a richly detailed structured "Brand DNA" from public website text.
 
 Rules:
-- Be conservative: only infer what is supported by the text.
-- No hallucinated facts (pricing, claims, customers) unless clearly stated.
+- Maximize useful, high-signal marketing info (positioning, business model, ICP, offer, proof points, competitors, keywords).
+- Do not hallucinate. If something is uncertain, either omit it or include it with LOW confidence and a citation.
+- Every important inferred/extracted claim should have a citation: a URL + a short quote snippet.
 - Output MUST be valid JSON matching the provided schema.
-- Keep copyable wording short and reusable.
+- Keep wording short and reusable for ads.
 `.trim();
 
 export function brandAnalyzerUserPrompt(args: {
@@ -30,6 +31,15 @@ ${args.pages
     (p, i) => `\n[${i + 1}] URL: ${p.url}\nTitle: ${p.title ?? ""}\nContent:\n${p.content}\n`
   )
   .join("\n")}
+
+Output requirements:
+- Fill ALL core sections: brand, audience, offer, tone, constraints, assets.
+- Prefer brand.name from og:site_name / application-name / JSON-LD Organization.name if present in content.
+- If you infer industry/businessModel, cite the exact wording that supports it.
+- For brand.businessModel, you MUST output exactly one of: marketplace, saas, agency, ecommerce, media, services, other.
+- If unsure, use "other".
+- Populate citations[] with entries like:
+  { "field": "brand.name", "url": "<page url>", "quote": "<short quote>", "confidence": 0.8 }
 `.trim();
 }
 
@@ -43,13 +53,29 @@ Rules:
 - Follow the brand tone, forbidden/preferred words, and compliance constraints.
 - Avoid fluff; optimize for clarity and conversion.
 - Create multiple distinct angles; avoid near-duplicates.
+- Never output placeholders like "Ad Text", "Description", "Headline", "Default Angle", or "General".
+- Each creative must include at least one concrete detail from Brand DNA (industry, offer, feature, use case, audience, etc.).
 `.trim();
 
 export function creativeEngineUserPrompt(args: {
   type: CreativeType;
   brandDna: unknown;
   notes?: string;
+  creativeCount?: number;
 }) {
+  const count = typeof args.creativeCount === "number" && Number.isFinite(args.creativeCount)
+    ? Math.min(6, Math.max(1, Math.floor(args.creativeCount)))
+    : undefined;
+
+  const countInstruction =
+    args.type === "META_ADS"
+      ? `Generate ${count ?? 4} distinct ads (array "ads"), each with different angles.`
+      : args.type === "GOOGLE_ADS"
+        ? `Generate ${count ?? 4} distinct campaigns (array "campaigns"), each with different angles.`
+        : count
+          ? `Generate at least ${count} distinct items/angles for this creative type.`
+          : `Generate multiple distinct angles for this creative type.`;
+
   return `
 Generate creatives for the specific type: "${args.type}".
 
@@ -60,6 +86,9 @@ Your output JSON must start with:
   ...
 }
 followed by the specific fields for this creative type.
+
+Quantity requirement:
+${countInstruction}
 
 Brand DNA (JSON):
 ${JSON.stringify(args.brandDna, null, 2)}
