@@ -111,88 +111,88 @@ export const BrandDnaSchema = z.object({
 export type BrandDna = z.infer<typeof BrandDnaSchema>;
 
 const MetaAdSchema = z.object({
-  angle: z.string().min(1),
-  audienceSegment: z.string().min(1),
-  primaryText: z.string().min(1),
-  headline: z.string().min(1),
-  description: z.string().min(1),
-  cta: z.string().min(1),
+  angle: z.string().min(1).default("Default Angle"),
+  audienceSegment: z.string().min(1).default("General"),
+  primaryText: z.string().min(1).default("Ad Text"),
+  headline: z.string().min(1).default("Headline"),
+  description: z.string().min(1).default("Description"),
+  cta: z.string().min(1).default("Learn More"),
 });
 
 const GoogleAdSchema = z.object({
-  angle: z.string().min(1),
-  headlines: z.array(z.string().min(1)).min(6).max(15),
-  descriptions: z.array(z.string().min(1)).min(3).max(6),
-  keywords: z.array(z.string().min(1)).min(8).max(25),
+  angle: z.string().min(1).default("Angle"),
+  headlines: z.array(z.string().min(1)).min(1).default(["Headline"]),
+  descriptions: z.array(z.string().min(1)).min(1).default(["Description"]),
+  keywords: z.array(z.string().min(1)).min(1).default(["keyword"]),
 });
 
 const TikTokHookSchema = z.object({
-  angle: z.string().min(1),
-  hook: z.string().min(1),
-  onScreenText: z.string().min(1),
-  voiceover: z.string().min(1),
-  shotList: z.array(z.string().min(1)).min(3).max(8),
+  angle: z.string().min(1).default("Angle"),
+  hook: z.string().min(1).default("Hook"),
+  onScreenText: z.string().min(1).default("Text"),
+  voiceover: z.string().min(1).default("VO"),
+  shotList: z.array(z.string().min(1)).min(1).default(["Shot 1"]),
 });
 
 const EmailSchema = z.object({
-  angle: z.string().min(1),
-  subjectLines: z.array(z.string().min(1)).min(5).max(10),
-  previewText: z.string().min(1),
-  bodyMarkdown: z.string().min(1),
+  angle: z.string().min(1).default("Angle"),
+  subjectLines: z.array(z.string().min(1)).min(1).default(["Subject"]),
+  previewText: z.string().min(1).default("Preview"),
+  bodyMarkdown: z.string().min(1).default("Body"),
 });
 
 const SocialPostSchema = z.object({
-  platform: z.enum(["linkedin", "x", "instagram"]),
-  angle: z.string().min(1),
-  post: z.string().min(1),
+  platform: z.enum(["linkedin", "x", "instagram"]).default("linkedin"),
+  angle: z.string().min(1).default("Angle"),
+  post: z.string().min(1).default("Post"),
   hashtags: z.array(z.string().min(1)).default([]),
 });
 
 export const CreativeOutputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("META_ADS"),
-    ads: z.array(MetaAdSchema).min(6).max(12),
+    ads: z.array(MetaAdSchema).min(1).default([]),
   }),
   z.object({
     type: z.literal("GOOGLE_ADS"),
-    campaigns: z.array(GoogleAdSchema).min(3).max(6),
+    campaigns: z.array(GoogleAdSchema).min(1).default([]),
   }),
   z.object({
     type: z.literal("TIKTOK_HOOKS"),
-    hooks: z.array(TikTokHookSchema).min(10).max(25),
+    hooks: z.array(TikTokHookSchema).min(1).default([]),
   }),
   z.object({
     type: z.literal("MARKETING_EMAIL"),
-    email: EmailSchema,
+    email: EmailSchema.default({}),
   }),
   z.object({
     type: z.literal("SOCIAL_POSTS"),
-    posts: z.array(SocialPostSchema).min(9).max(18),
+    posts: z.array(SocialPostSchema).min(1).default([]),
   }),
   z.object({
     type: z.literal("ANGLES_HOOKS_HEADLINES"),
-    angles: z.array(z.string().min(1)).min(12).max(30),
-    hooks: z.array(z.string().min(1)).min(12).max(30),
-    headlines: z.array(z.string().min(1)).min(12).max(30),
+    angles: z.array(z.string().min(1)).min(1).default(["Angle"]),
+    hooks: z.array(z.string().min(1)).min(1).default(["Hook"]),
+    headlines: z.array(z.string().min(1)).min(1).default(["Headline"]),
   }),
   z.object({
     type: z.literal("AB_VARIANTS"),
     variants: z
       .array(
         z.object({
-          angle: z.string().min(1),
+          angle: z.string().min(1).default("Angle"),
           a: z.object({
-            headline: z.string().min(1),
-            primaryText: z.string().min(1),
+            headline: z.string().min(1).default("H"),
+            primaryText: z.string().min(1).default("T"),
           }),
           b: z.object({
-            headline: z.string().min(1),
-            primaryText: z.string().min(1),
+            headline: z.string().min(1).default("H"),
+            primaryText: z.string().min(1).default("T"),
           }),
         })
       )
-      .min(4)
-      .max(10),
+      .min(1)
+      .default([]),
   }),
 ]);
 
