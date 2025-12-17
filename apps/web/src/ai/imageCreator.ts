@@ -219,9 +219,7 @@ Headline (if any): ${args.variant?.headline ?? ""}
 Art direction:
 - clean, modern, product-led composition
 - strong contrast and readable hierarchy
-- IMPORTANT: DO NOT include any logos, brand names, or text
-- IMPORTANT: Leave clear negative space (top-left for logo, center for product)
-- avoid disallowed claims and sensitive topics
+- no baked-in text (copy will be overlaid separately)
 
 Return a single image matching the direction.
 `.trim();

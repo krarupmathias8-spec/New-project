@@ -47,6 +47,17 @@ function inferBrandNameFromTitle(title?: string) {
   return cleaned && cleaned.length >= 2 ? cleaned : null;
 }
 
+function shouldPreferDomainBrandName(domainName: string, existingName: string) {
+  const dn = domainName.toLowerCase();
+  const en = existingName.toLowerCase();
+  if (!existingName || existingName === "Unknown Brand") return true;
+  if (en.includes(dn)) return false;
+  // Heuristics: titles often contain taglines (e.g. "Verified Businesses for Sale")
+  if (existingName.length >= 26) return true;
+  if (/\b(for sale|for\s+\w+|buy|sell|verified|welcome|discover)\b/i.test(existingName)) return true;
+  return false;
+}
+
 function mergeScrapedAssetsIntoBrandDna(args: {
   dna: unknown;
   primaryUrl: string;
@@ -59,6 +70,11 @@ function mergeScrapedAssetsIntoBrandDna(args: {
   const scrapedLogos = uniqByUrl(
     args.scraped.assets
       .filter((a) => a.kind === "logo")
+      .map((a) => ({ url: a.url, alt: a.alt, sourcePageUrl: a.sourcePageUrl }))
+  );
+  const scrapedIcons = uniqByUrl(
+    args.scraped.assets
+      .filter((a) => a.kind === "icon")
       .map((a) => ({ url: a.url, alt: a.alt, sourcePageUrl: a.sourcePageUrl }))
   );
   const scrapedProducts = uniqByUrl(
@@ -81,7 +97,7 @@ function mergeScrapedAssetsIntoBrandDna(args: {
     logos:
       existingLogos.length > 0
         ? existingLogos
-        : scrapedLogos,
+        : (scrapedLogos.length ? scrapedLogos : scrapedIcons),
     productImages:
       existingProducts.length > 0
         ? existingProducts
@@ -94,12 +110,16 @@ function mergeScrapedAssetsIntoBrandDna(args: {
 
   // Also patch brand basics if the model left defaults.
   const titleName = inferBrandNameFromTitle(args.scraped.pages?.[0]?.title ?? args.scraped.pages?.[1]?.title);
-  const fallbackName = titleName ?? inferBrandNameFromPrimaryUrl(args.primaryUrl);
+  const domainName = inferBrandNameFromPrimaryUrl(args.primaryUrl);
+  const fallbackName = titleName ?? domainName;
   const existingName = asStr(brand.name);
   const patchedBrand = {
     ...brand,
     website: asStr(brand.website) ?? args.primaryUrl,
-    name: !existingName || existingName === "Unknown Brand" ? fallbackName : existingName,
+    name:
+      existingName && !shouldPreferDomainBrandName(domainName, existingName)
+        ? existingName
+        : fallbackName,
   };
 
   return {
