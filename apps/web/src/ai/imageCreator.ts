@@ -35,26 +35,116 @@ function formatToSize(format: ImageFormat): { width: number; height: number; siz
 type BrandAssetPick = {
   logoUrl?: string;
   productImageUrl?: string;
+  logoSource?: string;
 };
 
 function asString(val: unknown): string | undefined {
   return typeof val === "string" && val.trim() ? val.trim() : undefined;
 }
 
+function getBrandHost(brandDna: unknown): string | null {
+  const dna = asRecord(brandDna);
+  const brand = asRecord(dna.brand);
+  const website = asString(brand.website);
+  if (!website) return null;
+  try {
+    return new URL(website).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function slugify(input: string) {
+  return input
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "")
+    .trim();
+}
+
+async function scoreImageUrl(url: string): Promise<number> {
+  try {
+    const buf = await fetchImageBuffer(url);
+    const meta = await sharp(buf).metadata();
+    const w = meta.width ?? 0;
+    const h = meta.height ?? 0;
+    const minDim = Math.min(w, h);
+    // prefer larger (up to a point)
+    return Math.min(60, Math.floor(minDim / 8));
+  } catch {
+    return 0;
+  }
+}
+
+async function pickBestLogo(brandDna: unknown): Promise<{ url?: string; source?: string }> {
+  const dna = asRecord(brandDna);
+  const brand = asRecord(dna.brand);
+  const assets = asRecord(dna.assets);
+  const host = getBrandHost(brandDna);
+  const brandName = asString(brand.name) ?? "";
+  const brandSlug = brandName ? slugify(brandName) : "";
+
+  const logos = Array.isArray(assets.logos) ? (assets.logos as unknown[]) : [];
+  const icons = Array.isArray(assets.icons) ? (assets.icons as unknown[]) : [];
+
+  const candidates: Array<{ url: string; kind: "logo" | "icon"; score: number }> = [];
+
+  for (const it of logos) {
+    const u = asString(asRecord(it).url);
+    if (u) candidates.push({ url: u, kind: "logo", score: 100 });
+  }
+  for (const it of icons) {
+    const u = asString(asRecord(it).url);
+    if (u) candidates.push({ url: u, kind: "icon", score: 40 });
+  }
+
+  if (!candidates.length) return {};
+
+  for (const c of candidates) {
+    const lower = c.url.toLowerCase();
+    // strong positives
+    if (lower.includes("logo") || lower.includes("wordmark") || lower.includes("brand")) c.score += 40;
+    if (lower.endsWith(".svg") || lower.endsWith(".png")) c.score += 15;
+    // negatives
+    if (lower.includes("favicon") || lower.endsWith(".ico")) c.score -= 35;
+    if (lower.includes("sprite")) c.score -= 25;
+    if (lower.includes("og-image") || lower.includes("ogimage")) c.score -= 40;
+    // prefer same host
+    if (host) {
+      try {
+        const u = new URL(c.url);
+        const h = u.hostname.replace(/^www\./, "");
+        if (h === host) c.score += 12;
+      } catch {
+        // ignore
+      }
+    }
+    // prefer URL containing brand slug (if safe)
+    if (brandSlug && lower.replace(/[^a-z0-9]/g, "").includes(brandSlug)) c.score += 10;
+    // apple-touch-icon is often a decent large icon
+    if (lower.includes("apple-touch-icon")) c.score += 10;
+  }
+
+  // take top few and add a quick dimension-based score (best effort)
+  const top = candidates.sort((a, b) => b.score - a.score).slice(0, 6);
+  for (const c of top) c.score += await scoreImageUrl(c.url);
+
+  const best = top.sort((a, b) => b.score - a.score)[0];
+  return { url: best?.url, source: best ? `${best.kind}:${best.score}` : undefined };
+}
+
 function pickBrandAssets(brandDna: unknown): BrandAssetPick {
   const dna = asRecord(brandDna);
   const assets = asRecord(dna.assets);
-  const logos = Array.isArray(assets.logos) ? (assets.logos as unknown[]) : [];
   const productImages = Array.isArray(assets.productImages) ? (assets.productImages as unknown[]) : [];
   const ogImages = Array.isArray(assets.ogImages) ? (assets.ogImages as unknown[]) : [];
 
-  const logoUrl = asString(asRecord(logos[0]).url) ?? asString(asRecord(logos[1]).url);
   const productImageUrl =
     asString(asRecord(productImages[0]).url) ??
     asString(asRecord(productImages[1]).url) ??
     asString(asRecord(ogImages[0]).url);
 
-  return { logoUrl, productImageUrl };
+  return { productImageUrl };
 }
 
 async function fetchImageBuffer(url: string): Promise<Buffer> {
@@ -241,7 +331,11 @@ export async function generateAdImage(args: {
 
   const backgroundPng = await getBackgroundPng({ model, prompt, size });
   const useAssets = args.useBrandAssets ?? true;
-  const assets = useAssets ? pickBrandAssets(args.brandDna) : {};
+  const baseAssets: BrandAssetPick = useAssets ? pickBrandAssets(args.brandDna) : {};
+  const bestLogo = useAssets ? await pickBestLogo(args.brandDna) : {};
+  const assets: BrandAssetPick = useAssets
+    ? { ...baseAssets, logoUrl: bestLogo.url, logoSource: bestLogo.source }
+    : {};
   const finalPng =
     assets.logoUrl || assets.productImageUrl
       ? await compositeBrandAssets({

@@ -98,7 +98,7 @@ function mergeScrapedAssetsIntoBrandDna(args: {
     logos:
       existingLogos.length > 0
         ? existingLogos
-        : (scrapedLogos.length ? scrapedLogos : scrapedIcons),
+        : scrapedLogos,
     icons: existingIcons.length > 0 ? existingIcons : scrapedIcons.map((i) => ({ url: i.url, sourcePageUrl: i.sourcePageUrl })),
     productImages:
       existingProducts.length > 0
