@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { runGenerationJob, runImagesJob, runIngestionJob } from "@/jobs/processor";
-import type { CreativeType, ImageFormat } from "@/generated/prisma";
+import type { CreativeType } from "@/generated/prisma";
 
 export async function recoverStuckJobs() {
   // Recover stuck jobs (previous invocation timed out).
@@ -78,8 +78,7 @@ export async function processNextJobs(maxJobs = 1) {
         const p = job.payload as { generationRunId: string; type: string };
         await runGenerationJob(p as unknown as { generationRunId: string; type: CreativeType });
       } else if (job.type === "IMAGES") {
-        const p = job.payload as { generationRunId: string; formats: string[] };
-        await runImagesJob(p as unknown as { generationRunId: string; formats: ImageFormat[] });
+        await runImagesJob(job.payload);
       }
 
       await prisma.job.update({

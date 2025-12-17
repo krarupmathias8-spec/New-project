@@ -22,8 +22,12 @@ async function handler(req: Request) {
 
   await recoverStuckJobs();
 
-  // Process a tiny batch to avoid serverless timeouts.
-  const result = await processNextJobs(1);
+  // Process a small batch. Keep this low to avoid serverless timeouts.
+  const url = new URL(req.url);
+  const raw = url.searchParams.get("maxJobs");
+  const requested = raw ? Number(raw) : 3;
+  const maxJobs = Number.isFinite(requested) ? Math.min(10, Math.max(1, Math.floor(requested))) : 3;
+  const result = await processNextJobs(maxJobs);
 
   console.log("[cron] done", result);
   return NextResponse.json(result);

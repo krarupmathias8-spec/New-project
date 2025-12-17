@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AutoRefresh } from "./AutoRefresh";
 
 function asObj(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -164,6 +165,7 @@ export default async function GenerationPage({
       status: true,
       createdAt: true,
       finishedAt: true,
+      parameters: true,
       output: true,
       error: true,
       visualAssets: {
@@ -175,9 +177,16 @@ export default async function GenerationPage({
   if (!gen) redirect(`/dashboard/projects/${projectId}`);
 
   const outputObj = gen.output ?? {};
+  const paramsObj = asObj(gen.parameters);
+  const requestedCount =
+    typeof paramsObj.creativeCount === "number" ? paramsObj.creativeCount : Number(paramsObj.creativeCount);
+  const creativeCount = Number.isFinite(requestedCount) ? Math.min(6, Math.max(1, Math.floor(requestedCount))) : 4;
+  const expectedImages = creativeCount * 3; // 1:1, 4:5, 16:9
+  const isImagesStillGenerating = gen.status !== "FAILED" && gen.visualAssets.length < expectedImages;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
+      <AutoRefresh enabled={isImagesStillGenerating} />
       <header className="space-y-2">
         <div className="text-sm text-muted-foreground">
           <Link className="font-medium text-foreground hover:underline" href={`/dashboard/projects/${projectId}`}>
@@ -238,12 +247,14 @@ export default async function GenerationPage({
       <Card className="shadow-soft">
         <CardHeader>
           <CardTitle>Visual assets</CardTitle>
-          <CardDescription>Generated ad images (square/portrait/landscape).</CardDescription>
+          <CardDescription>
+            Generated creatives ({gen.visualAssets.length}/{expectedImages}) · square/portrait/landscape.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {gen.visualAssets.length === 0 ? (
             <div className="rounded-lg border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
-              No images generated for this run yet.
+              {isImagesStillGenerating ? "Generating images…" : "No images generated for this run yet."}
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
